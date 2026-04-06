@@ -53,7 +53,8 @@ nav{position:sticky;top:0;z-index:200;background:rgba(11,15,26,.88);backdrop-fil
 .form-input{width:100%;background:rgba(255,255,255,.04);border:1px solid var(--bdr2);border-radius:12px;color:#fff;font-family:'Inter',sans-serif;font-size:15px;padding:13px 16px;outline:none;transition:all .2s}
 .form-input:focus{border-color:var(--pri);box-shadow:0 0 0 3px rgba(138,0,196,.15)}
 .form-input::placeholder{color:var(--faint)}
-select.form-input{cursor:pointer}
+select.form-input{cursor:pointer;background:#1E293B;color:#fff;}
+.form-input option{background:#1E293B;color:#fff;}
 .form-group{margin-bottom:18px}
 .page-wrap{max-width:860px;margin:0 auto;padding:36px 24px 80px}
 .page-back{display:flex;align-items:center;gap:12px;margin-bottom:28px}
@@ -197,7 +198,7 @@ select.form-input{cursor:pointer}
 @keyframes wdb{0%,80%,100%{transform:scale(.6);opacity:.4}40%{transform:scale(1);opacity:1}}
 
 /* GAME */
-#s-game{min-height:100vh;display:flex;flex-direction:column}
+#s-game{min-height:100vh;flex-direction:column}#s-game.active{display:flex}
 .gtop{background:rgba(11,15,26,.9);backdrop-filter:blur(20px);border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:20px;padding:0 24px;height:54px;flex-shrink:0}
 .tbs{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--muted)}.tbs span{color:#fff}
 .tbc{flex:1;text-align:center;font-family:'Poppins',sans-serif;font-size:14px;font-weight:700}
@@ -358,9 +359,9 @@ button.ans-btn:disabled{cursor:default}
     <span class="lt"><span class="lq">quid</span><span class="lg">.gg</span></span>
   </div>
   <div class="nav-right">
-    <button class="btn btn-ghost" style="padding:9px 18px;font-size:13px" onclick="go('profile')">👤 Profil</button>
-    <button class="btn btn-ghost" style="padding:9px 18px;font-size:13px">Se connecter</button>
-    <button class="btn btn-acc" style="padding:9px 18px;font-size:13px" onclick="go('create-room')">S'inscrire</button>
+    <button class="btn btn-ghost" id="nav-profile-btn" style="padding:9px 18px;font-size:13px;display:none" onclick="go('profile')">👤 Profil</button>
+    <button class="btn btn-ghost" id="nav-login-btn" style="padding:9px 18px;font-size:13px" onclick="loginDemo()">Se connecter</button>
+    <button class="btn btn-acc" id="nav-signup-btn" style="padding:9px 18px;font-size:13px" onclick="signupDemo()">S'inscrire</button>
   </div>
 </nav>
 
@@ -442,8 +443,8 @@ button.ans-btn:disabled{cursor:default}
         </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
-        <div class="form-group" style="margin-bottom:0"><label class="form-label">Questions</label><select class="form-input" id="cr-qcount"><option value="5">5 questions</option><option value="10" selected>10 questions</option><option value="15">15 questions</option></select></div>
-        <div class="form-group" style="margin-bottom:0"><label class="form-label" id="qtlbl">Temps / question</label><select class="form-input" id="cr-qtime"><option value="15">15 secondes</option><option value="20" selected>20 secondes</option><option value="30">30 secondes</option></select></div>
+        <div class="form-group" style="margin-bottom:0"><label class="form-label">Objectif de points</label><select class="form-input" id="cr-qcount" style="background:#1E293B;color:#fff;border-color:rgba(138,0,196,.4)"><option value="10000" selected>10 000 points</option><option value="25000">25 000 points</option><option value="50000">50 000 points</option></select></div>
+        <div class="form-group" style="margin-bottom:0"><label class="form-label" id="qtlbl">Temps / question</label><select class="form-input" id="cr-qtime" style="background:#1E293B;color:#fff;border-color:rgba(138,0,196,.4)"><option value="15">15 secondes</option><option value="20" selected>20 secondes</option><option value="30">30 secondes</option></select></div>
       </div>
     </div>
     <button class="btn btn-acc btn-full" style="padding:16px;font-size:16px" onclick="createRoom()">⚡ Créer le salon</button>
@@ -598,8 +599,8 @@ button.ans-btn:disabled{cursor:default}
 </div>
 
 <script>
-const SUPABASE_URL='https://nbgvoclpbnvetbanyqbc.supabase.co';
-const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5iZ3ZvY2xwYm52ZXRiYW55cWJjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU0MDM3OTAsImV4cCI6MjA5MDk3OTc5MH0.bncYcNbTQIFmqHOQlGq3iDmac_Ql__K_CnFlsHVDg14';
+const SUPABASE_URL='REMPLACE_PAR_TON_URL_SUPABASE';
+const SUPABASE_KEY='REMPLACE_PAR_TA_CLE_ANON_SUPABASE';
 const ANTHROPIC_KEY='REMPLACE_PAR_TA_CLE_ANTHROPIC';
 const AVATARS=['🦊','🐬','🦁','🐧','🦄','🐸','🦋','🐺','🦉','🐙','🦅','🐯','🦈','🦖','🐲','🐻','🐼','🦒','🦓','🐘','🐆','🦕','🐉','🦑'];
 const COLORS=['#A020E0','#2CFF05','#FF4D6D','#FFBE0B','#8A00C4','#38bdf8','#34D399','#F472B6'];
@@ -741,7 +742,7 @@ function shareRoom(){if(navigator.share)navigator.share({title:'Quid.gg',text:`R
 // LAUNCH
 async function launchGame(){
   go('loading');sndStart();
-  G.questions=await fetchQs(G.settings.categories.join(', '),G.settings.qCount,G.settings.diff,G.settings.mode);
+  G.questions=shuffle(await fetchQs(G.settings.categories.join(', '),G.settings.qCount,G.settings.diff,G.settings.mode));
   G.qIdx=0;G.players.forEach(p=>G.scores[p.name]=0);G.dotAns={};G.pu={f50:1,x2:1,d2:1};G.x2Active=false;
   if(sb)await sb.from('rooms').update({status:'playing',questions:G.questions,current_q:0}).eq('code',G.code);
   showQuestion();
@@ -749,14 +750,22 @@ async function launchGame(){
 
 // FETCH QUESTIONS
 async function fetchQs(cats,n,diff,mode){
-  if(ANTHROPIC_KEY.startsWith('REMPLACE'))return shuffle(fallback()).slice(0,n);
+  if(ANTHROPIC_KEY.startsWith('REMPLACE'))return shuffle(fallback(cats,diff)).slice(0,n);
   const isText=mode==='FREE'||mode==='MVP';
-  const prompt=`Génère ${n} questions de culture générale variées sur : ${cats}.
-Difficulté : ${diff==='easy'?'facile':diff==='expert'?'très difficile':'niveau moyen'}.
-Mode : ${isText?'réponse écrite libre (1 mot ou phrase courte), fournis juste answer':'QCM 4 options, 1 correcte'}.
-Types variés : texte, image (drapeaux avec emoji, logos, monuments, célébrités, cinéma).
-UNIQUEMENT JSON valide :
-{"questions":[{"category":"Nom","type":"text|image","imageHint":"emoji si image","question":"?","${isText?'answer":"réponse"':'"options":["A","B","C","D"],"correct":0'},"explanation":"1 phrase."}]}`;
+  const diffInstructions = {
+    easy: 'FACILE : questions très connues, réponses évidentes pour le grand public. Exemples : capitales des grands pays, acteurs célèbres, événements historiques majeurs, logos de marques mondiales. Tout le monde doit pouvoir répondre.',
+    normal: 'NORMAL : culture générale standard. Ni trop facile ni trop dur. Mélange de questions populaires et légèrement pointues. La moitié des joueurs doit pouvoir répondre.',
+    expert: 'EXPERT : questions très difficiles, pointues, qui nécessitent une vraie culture générale approfondie. Détails historiques précis, personnalités moins connues, faits scientifiques complexes, géographie avancée. Seuls les experts répondent correctement.'
+  };
+  const catInstructions = `OBLIGATOIRE : Les questions DOIVENT porter EXCLUSIVEMENT sur ces catégories : ${cats}. Ne génère AUCUNE question hors de ces catégories. Varie bien entre elles.`;
+  const prompt=`Génère ${n} questions de culture générale.
+${catInstructions}
+Niveau de difficulté : ${diffInstructions[diff]||diffInstructions.normal}
+Mode de réponse : ${isText?'Réponse écrite libre (1 mot ou courte phrase). Fournis uniquement le champ "answer" avec la réponse exacte attendue.':'QCM avec exactement 4 options, dont 1 seule est correcte. Les mauvaises réponses doivent être plausibles mais clairement incorrectes.'}
+Types de questions à varier : texte classique, image (drapeaux=emoji du drapeau, logos de marques=emoji, monuments=emoji, personnages célèbres=emoji, extraits cinéma=emoji thématique).
+Mélange aléatoire l'ordre des questions. Ne commence pas toutes les questions de la même façon.
+RÉPONDS UNIQUEMENT avec ce JSON valide, sans markdown, sans texte avant ou après :
+{"questions":[{"category":"NomCategorie","type":"text|image","imageHint":"emoji représentatif si type image, sinon null","question":"La question ?","${isText?'answer":"réponse exacte"':'"options":["Option A","Option B","Option C","Option D"],"correct":0'},"explanation":"Explication courte et intéressante en 1 phrase."}]}`;
   try{
     const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:2000,messages:[{role:'user',content:prompt}]})});
     const d=await r.json();
@@ -765,7 +774,8 @@ UNIQUEMENT JSON valide :
   }catch{return shuffle(fallback()).slice(0,n);}
 }
 function shuffle(a){return[...a].sort(()=>Math.random()-.5);}
-function fallback(){return[
+function fallback(cats,diff){
+  const all=[
   {category:"Géographie",type:"image",imageHint:"🇯🇵",question:"De quel pays est ce drapeau ?",options:["Chine","Corée du Sud","Japon","Vietnam"],correct:2,answer:"Japon",explanation:"Le drapeau japonais représente un disque solaire rouge sur fond blanc."},
   {category:"Sciences",type:"text",question:"Quel est le symbole chimique de l'or ?",options:["Or","Au","Ag","Go"],correct:1,answer:"Au",explanation:"Au vient du latin Aurum, nom latin de l'or."},
   {category:"Histoire",type:"text",question:"En quelle année a commencé la Révolution française ?",options:["1787","1789","1791","1793"],correct:1,answer:"1789",explanation:"La prise de la Bastille le 14 juillet 1789 marqua le début de la Révolution."},
@@ -781,7 +791,22 @@ function fallback(){return[
   {category:"Culture Pop",type:"text",question:"Dans quel pays Pokémon a-t-il été créé ?",options:["Corée","Chine","Japon","États-Unis"],correct:2,answer:"Japon",explanation:"Pokémon a été créé par Satoshi Tajiri et Game Freak au Japon en 1995."},
   {category:"Littérature",type:"text",question:"Qui a écrit 'Les Misérables' ?",options:["Zola","Flaubert","Victor Hugo","Balzac"],correct:2,answer:"Victor Hugo",explanation:"Les Misérables (1862) est le chef-d'œuvre de Victor Hugo, explorant la misère sociale."},
   {category:"Géographie",type:"text",question:"Quel est le plus long fleuve du monde ?",options:["Amazone","Congo","Nil","Mississippi"],correct:2,answer:"Nil",explanation:"Le Nil mesure environ 6 650 km, traversant principalement l'Égypte et le Soudan."},
-];}
+  // Expert extras
+  {category:"Sciences",type:"text",question:"Quelle est la formule chimique de l'eau ?",options:["H2O","CO2","O2","H2"],correct:0,answer:"H2O",explanation:"L'eau est une molécule formée de 2 atomes d'hydrogène et 1 d'oxygène."},
+  {category:"Histoire",type:"text",question:"En quelle année Christophe Colomb a-t-il découvert l'Amérique ?",options:["1488","1492","1498","1502"],correct:1,answer:"1492",explanation:"Colomb débarqua aux Bahamas le 12 octobre 1492 lors de son premier voyage."},
+  {category:"Géographie",type:"image",imageHint:"🇩🇪",question:"De quel pays est ce drapeau tricolore noir-rouge-or ?",options:["Belgique","Allemagne","Autriche","Hongrie"],correct:1,answer:"Allemagne",explanation:"Le drapeau allemand aux couleurs noir-rouge-or date de la Révolution de 1848."},
+  {category:"Cinéma",type:"text",question:"Qui a réalisé Pulp Fiction ?",options:["Spielberg","Scorsese","Tarantino","Kubrick"],correct:2,answer:"Tarantino",explanation:"Pulp Fiction (1994), réalisé par Quentin Tarantino, a remporté la Palme d'or à Cannes."},
+  {category:"Sport",type:"text",question:"Combien de grammes pèse une balle de tennis officielle ?",options:["45g","56g","70g","80g"],correct:1,answer:"56g",explanation:"Une balle de tennis officielle pèse entre 56 et 59,4 grammes selon les règles ITF."},
+  {category:"Musique",type:"text",question:"Combien de cordes a une guitare classique ?",options:["4","6","8","12"],correct:1,answer:"6",explanation:"La guitare classique possède 6 cordes, accordées en mi-la-ré-sol-si-mi."},
+];
+  // Filter by selected categories
+  const catList=cats?cats.split(', ').map(c=>c.trim().toLowerCase()):[];
+  let filtered=catList.length?all.filter(q=>catList.some(cat=>q.category.toLowerCase().includes(cat)||cat.includes(q.category.toLowerCase()))):all;
+  if(!filtered.length)filtered=all;
+  // Filter/weight by difficulty
+  if(diff==='easy')filtered=filtered.filter(q=>!['Expert','Sciences','Géographie'].includes(q.category)).concat(filtered).slice(0,filtered.length);
+  return filtered;
+}
 
 // SHOW QUESTION
 function showQuestion(){
@@ -895,12 +920,35 @@ function showResultBox(ok,pts,bonus,expl,correctAns){
     :`<div class="rbox bad"><span class="ri">❌</span><div class="rt bad">Raté !</div><div class="rsub">Bonne réponse : ${correctAns}</div>${expl?`<div class="qexpl" style="margin-top:10px"><strong>💡 Le saviez-vous ?</strong> ${expl}</div>`:''}</div>`;
 }
 
-// NEXT COUNTDOWN 3-2-1
+// NEXT COUNTDOWN 3-2-1 -> show next question directly
 function startNextCd(){
-  let cd=3;const el=document.getElementById('gm-next');el.style.display='block';
+  let cd=5;const el=document.getElementById('gm-next');el.style.display='block';
   const render=()=>{
-    if(cd<=0){clearInterval(G.nextInt);el.style.display='none';interLB();return;}
+    if(cd<=0){
+      clearInterval(G.nextInt);el.style.display='none';
+      const isLast=G.qIdx+1>=G.questions.length;
+      G.qIdx++;
+      if(isLast){if(G.isHost&&sb)sb.from('rooms').update({status:'finished'}).eq('code',G.code);showFinalCountdown();}
+      else{if(G.isHost&&sb)sb.from('rooms').update({current_q:G.qIdx,status:'next_question'}).eq('code',G.code);showQuestion();}
+      return;
+    }
     el.innerHTML=`<div class="next-cd"><span class="nc-lbl">Prochaine question dans</span><span class="nc-num">${cd}</span></div>`;
+    cd--;
+  };
+  render();G.nextInt=setInterval(render,1000);
+}
+
+// FINAL COUNTDOWN 5-4-3-2-1 then show results - shows on a dedicated countdown screen, not the question screen
+function showFinalCountdown(){
+  // Show a simple full-page countdown overlay then reveal final
+  clearInterval(G.timerInt);
+  document.getElementById('gm-result').innerHTML='';
+  document.getElementById('gm-next').style.display='block';
+  let cd=5;
+  const el=document.getElementById('gm-next');
+  const render=()=>{
+    if(cd<0){clearInterval(G.nextInt);el.style.display='none';showFinal();return;}
+    el.innerHTML=`<div class="next-cd"><span class="nc-lbl" style="color:var(--warn)">🏆 Résultats dans</span><span class="nc-num" style="color:var(--warn);text-shadow:0 0 30px rgba(255,190,11,.6)">${cd}</span></div>`;
     cd--;
   };
   render();G.nextInt=setInterval(render,1000);
@@ -998,9 +1046,21 @@ function changeRules(){if(G.isHost){go('create-room');}else toast('Seul l\'hôte
 async function leaveRoom(){
   if(sb){await sb.from('players').delete().eq('room_code',G.code).eq('name',G.name);if(chan)sb.removeChannel(chan);}
   Object.assign(G,{name:'',isHost:false,code:'',players:[],settings:{},questions:[],qIdx:0,scores:{},answered:false,selAns:null,timerInt:null,timeLeft:20,nextInt:null,dotAns:{},pu:{f50:1,x2:1,d2:1},x2Active:false});
-  go('home');
+  go('home');window.scrollTo({top:0,behavior:'smooth'});
 }
 function sortedPl(){return[...G.players].sort((a,b)=>(G.scores[b.name]||0)-(G.scores[a.name]||0));}
+
+// AUTH STATE
+let isLoggedIn=false;
+function loginDemo(){isLoggedIn=true;updateNav();go('profile');toast('✅ Connecté !','ok');}
+function signupDemo(){isLoggedIn=true;updateNav();go('create-room');toast('✅ Compte créé !','ok');}
+function updateNav(){
+  const pb=document.getElementById('nav-profile-btn');
+  const lb=document.getElementById('nav-login-btn');
+  const sb2=document.getElementById('nav-signup-btn');
+  if(isLoggedIn){if(pb)pb.style.display='';if(lb)lb.style.display='none';if(sb2){sb2.textContent='Créer une partie ⚡';sb2.onclick=()=>go('create-room');}}
+  else{if(pb)pb.style.display='none';if(lb)lb.style.display='';if(sb2){sb2.textContent="S'inscrire";sb2.onclick=signupDemo;}}
+}
 
 // PROFILE
 const ALL_AVS=['🦊','🐬','🦁','🐧','🦄','🐸','🦋','🐺','🦉','🐙','🦅','🐯','🦈','🦖','🐲','🐻','🐼','🦒','🦓','🐘','🐆','🦕','🐉','🦑'];
