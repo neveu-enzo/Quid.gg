@@ -612,18 +612,22 @@ button.ans-btn:disabled{cursor:default}
       <div class="card">
         <div class="card-title">✏ Nouvelle question</div>
         <div class="form-group">
-          <label class="form-label">Catégorie</label>
-          <input class="form-input" id="bk-add-cat" placeholder="Ex : Histoire, Géographie…" list="bk-cats-list"/>
+          <label class="form-label">Catégories <span style="color:var(--faint);font-weight:400">(plusieurs possibles)</span></label>
+          <div style="display:flex;gap:8px">
+            <input class="form-input" id="bk-add-cat" placeholder="Ex : Géographie" list="bk-cats-list"/>
+            <button class="btn btn-pri" style="padding:11px 16px;flex-shrink:0" onclick="addCatTag()">+ Ajouter</button>
+          </div>
           <datalist id="bk-cats-list"></datalist>
+          <div class="answers-tags" id="bk-cat-tags" style="margin-top:8px"></div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
           <div class="form-group">
-            <label class="form-label">Difficulté</label>
-            <select class="form-input" id="bk-add-diff" style="background:#1E293B;color:#fff">
-              <option value="easy">🌱 Facile</option>
-              <option value="normal" selected>⚡ Normal</option>
-              <option value="expert">🔥 Expert</option>
-            </select>
+            <label class="form-label">Difficultés <span style="color:var(--faint);font-weight:400">(plusieurs possibles)</span></label>
+            <div style="display:flex;flex-direction:column;gap:6px;margin-top:4px">
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px"><input type="checkbox" id="diff-ck-easy" value="easy" style="accent-color:var(--pri)"> 🌱 Facile</label>
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px"><input type="checkbox" id="diff-ck-normal" value="normal" checked style="accent-color:var(--pri)"> ⚡ Normal</label>
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px"><input type="checkbox" id="diff-ck-expert" value="expert" style="accent-color:var(--pri)"> 🔥 Expert</label>
+            </div>
           </div>
           <div class="form-group">
             <label class="form-label">Type</label>
@@ -634,8 +638,15 @@ button.ans-btn:disabled{cursor:default}
           </div>
         </div>
         <div class="form-group" id="bk-add-hint-wrap" style="display:none">
-          <label class="form-label">Emoji / indice image</label>
+          <label class="form-label">Emoji / indice image <span style="color:var(--faint);font-weight:400">(optionnel si URL fournie)</span></label>
           <input class="form-input" id="bk-add-hint" placeholder="Ex : 🗼 ou 🇫🇷"/>
+        </div>
+        <div class="form-group" id="bk-add-url-wrap" style="display:none">
+          <label class="form-label">URL de l'image <span style="color:var(--faint);font-weight:400">(libre de droit)</span></label>
+          <input class="form-input" id="bk-add-url" placeholder="https://upload.wikimedia.org/..."/>
+          <div id="bk-url-preview" style="margin-top:8px;display:none;text-align:center">
+            <img id="bk-url-img" style="max-width:100%;max-height:200px;border-radius:12px;object-fit:contain;background:var(--hover);padding:8px"/>
+          </div>
         </div>
         <div class="form-group">
           <label class="form-label">Question</label>
@@ -674,9 +685,9 @@ button.ans-btn:disabled{cursor:default}
         <div class="card-title">📄 Formats attendus</div>
         <div style="font-size:13px;color:var(--muted);line-height:1.8">
           <strong style="color:#fff">JSON</strong> — tableau d'objets :<br>
-          <code style="background:rgba(255,255,255,.06);border-radius:8px;padding:10px 14px;display:block;margin:8px 0;font-size:12px;color:var(--acc)">[{<br>&nbsp;"question": "Quelle est la capitale de la France ?",<br>&nbsp;"answers": ["Paris", "paris"],<br>&nbsp;"explanation": "Paris est la capitale depuis le Xe siècle.",<br>&nbsp;"category": "Géographie",<br>&nbsp;"difficulty": "easy",<br>&nbsp;"type": "text",<br>&nbsp;"imageHint": null<br>}]</code>
+          <code style="background:rgba(255,255,255,.06);border-radius:8px;padding:10px 14px;display:block;margin:8px 0;font-size:12px;color:var(--acc)">[{<br>&nbsp;"question": "Quelle est la capitale de l'Espagne ?",<br>&nbsp;"answers": ["Madrid", "madrid"],<br>&nbsp;"explanation": "Madrid est la capitale depuis le XVIe siècle.",<br>&nbsp;"category": ["Général", "Géographie"],<br>&nbsp;"difficulty": ["easy", "normal"],<br>&nbsp;"type": "text",<br>&nbsp;"imageHint": null,<br>&nbsp;"image_url": "https://upload.wikimedia.org/wikipedia/commons/..."<br>}]</code>
           <strong style="color:#fff">CSV</strong> — avec entête :<br>
-          <code style="background:rgba(255,255,255,.06);border-radius:8px;padding:10px 14px;display:block;margin:8px 0;font-size:12px;color:var(--acc)">question,answers,explanation,category,difficulty,type,imageHint<br>"Capitale de la France ?","Paris|paris","Paris capitale…","Géographie","easy","text",</code>
+          <code style="background:rgba(255,255,255,.06);border-radius:8px;padding:10px 14px;display:block;margin:8px 0;font-size:12px;color:var(--acc)">question,answers,explanation,category,difficulty,type,imageHint<br>"De quel film vient cette image ?","Le Roi Lion|roi lion","Sorti en 1994…","Cinéma","easy","image","https://upload.wikimedia.org/..."</code>
           <div style="margin-top:8px">Le champ <code style="color:var(--acc)">answers</code> accepte plusieurs valeurs séparées par <code style="color:var(--acc)">|</code></div>
         </div>
       </div>
@@ -900,19 +911,17 @@ document.addEventListener('click',()=>{if(AC&&AC.state==='suspended')AC.resume()
 
 // STATE
 let sb=null,chan=null;
+
+// Init Supabase immédiatement (pas besoin d'attendre DOMContentLoaded)
+try{
+  sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+  console.log('✅ Supabase connecté',sb);
+}catch(e){
+  console.error('❌ Supabase erreur',e);
+}
 const G={name:'',isHost:false,code:'',players:[],settings:{},questions:[],qIdx:0,scores:{},answered:false,selAns:null,timerInt:null,timeLeft:20,nextInt:null,dotAns:{},pu:{f50:1,x2:1,d2:1},x2Active:false,selMode:'FREE',selDiff:'normal',demoHostPoll:null,demoJoinPoll:null,freeAttempts:{}};
 
 window.addEventListener('DOMContentLoaded',()=>{
-  if(!SUPABASE_URL.startsWith('REMPLACE')){
-    try{
-      sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
-      console.log('✅ Supabase connecté',sb);
-    }catch(e){
-      console.error('❌ Supabase erreur',e);
-    }
-  }else{
-    console.warn('⚠️ Clefs Supabase non configurées');
-  }
   loadSession();
   renderAvGrid();
 });
@@ -999,15 +1008,25 @@ function subscribeRoom(){
     })
     .on('postgres_changes',{event:'UPDATE',schema:'public',table:'rooms',filter:`code=eq.${G.code}`},p=>{
       const r=p.new;
-      if(r.status==='playing'&&!G.isHost){G.questions=r.questions;G.qIdx=r.current_q;G.settings=r.settings;showQuestion();}
-      if(r.status==='next_question'&&!G.isHost){G.qIdx=r.current_q;showQuestion();}
-      if(r.status==='finished'&&!G.isHost){fetchScoresFinal();}
+      if(r.status==='playing'){
+        if(!G.isHost){G.questions=r.questions;G.settings=r.settings;}
+        G.qIdx=r.current_q;showQuestion();
+      }
+      if(r.status==='next_question'){
+        G.qIdx=r.current_q;showQuestion();
+      }
+      if(r.status==='finished'){fetchScoresFinal();}
     })
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'answers',filter:`room_code=eq.${G.code}`},p=>{
       const a=p.new;if(a.player_name!==G.name){
-        G.scores[a.player_name]=(G.scores[a.player_name]||0)+(a.points||0);
-        renderGameLB();
         if(G.settings.mode==='FREE'&&a.attempt)onOtherAttempt(a.player_name,a.attempt,a.is_correct);
+      }
+    })
+    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'players',filter:`room_code=eq.${G.code}`},p=>{
+      const pl=p.new;
+      if(pl.name!==G.name){
+        G.scores[pl.name]=pl.score||0;
+        renderGameLB();
       }
     })
     .subscribe();
@@ -1061,26 +1080,42 @@ async function fetchQs(cats,n,diff,mode){
     let pool=[...bankCache];
     // Filter by category
     if(catList.length&&catList[0]){
-      const filtered=pool.filter(q=>catList.some(cat=>(q.category||'').toLowerCase().includes(cat)||cat.includes((q.category||'').toLowerCase())));
+      const filtered=pool.filter(q=>{
+        // Supporte q.categories (array) ou q.category (string)
+        const qCats=Array.isArray(q.categories)?q.categories:[(q.category||'')];
+        return catList.some(cat=>qCats.some(qc=>qc.toLowerCase().includes(cat)||cat.includes(qc.toLowerCase())));
+      });
       if(filtered.length>=n)pool=filtered;
     }
-    // Filter by difficulty
-    const byDiff=pool.filter(q=>(q.difficulty||q.diff||'normal')===diff);
+    // Filter by difficulty — supporte q.difficulties (array) ou q.difficulty (string)
+    const byDiff=pool.filter(q=>{
+      const qDiffs=Array.isArray(q.difficulties)?q.difficulties:[(q.difficulty||q.diff||'normal')];
+      return qDiffs.includes(diff);
+    });
     if(byDiff.length>=n)pool=byDiff;
     if(pool.length>=n){
-      // Normalise answer field for multi-answer support
-      return shuffle(pool).slice(0,n).map(q=>({...q,answers:Array.isArray(q.answers)?q.answers:(q.answer?[q.answer]:[]),answer:Array.isArray(q.answers)?q.answers[0]:q.answer}));
+      // Exclure les questions déjà posées dans cette partie
+      const alreadyAsked=new Set((G.questions||[]).map(q=>q.question?.toLowerCase().trim()));
+      const fresh=pool.filter(q=>!alreadyAsked.has((q.question||'').toLowerCase().trim()));
+      const source=fresh.length>=n?fresh:pool; // fallback si pas assez de nouvelles
+      return shuffle(source).slice(0,n).map(q=>({...q,answers:Array.isArray(q.answers)?q.answers:(q.answer?[q.answer]:[]),answer:Array.isArray(q.answers)?q.answers[0]:q.answer}));
     }
   }
   // 2. IA si clef dispo
-  if(ANTHROPIC_KEY.startsWith('REMPLACE'))return shuffle(fallback(cats,diff)).slice(0,n);
+  if(ANTHROPIC_KEY.startsWith('REMPLACE')){
+    const alreadyAsked=new Set((G.questions||[]).map(q=>q.question?.toLowerCase().trim()));
+    const fb=fallback(cats,diff).filter(q=>!alreadyAsked.has((q.question||'').toLowerCase().trim()));
+    return shuffle(fb.length>=n?fb:fallback(cats,diff)).slice(0,n);
+  }
   const isText=mode==='FREE'||mode==='MVP';
   const diffInstructions = {
     easy: 'FACILE : questions très connues, réponses évidentes pour le grand public. Exemples : capitales des grands pays, acteurs célèbres, événements historiques majeurs, logos de marques mondiales. Tout le monde doit pouvoir répondre.',
     normal: 'NORMAL : culture générale standard. Ni trop facile ni trop dur. Mélange de questions populaires et légèrement pointues. La moitié des joueurs doit pouvoir répondre.',
     expert: 'EXPERT : questions très difficiles, pointues, qui nécessitent une vraie culture générale approfondie. Détails historiques précis, personnalités moins connues, faits scientifiques complexes, géographie avancée. Seuls les experts répondent correctement.'
   };
-  const catInstructions = `OBLIGATOIRE : Les questions DOIVENT porter EXCLUSIVEMENT sur ces catégories : ${cats}. Ne génère AUCUNE question hors de ces catégories. Varie bien entre elles.`;
+  const alreadyAsked=(G.questions||[]).map(q=>q.question).filter(Boolean);
+  const avoidInstructions=alreadyAsked.length?`INTERDIT : Ces questions ont déjà été posées, ne les répète PAS et ne pose pas de questions similaires : ${alreadyAsked.map(q=>`"${q}"`).join(', ')}. `:'';
+  const catInstructions = `OBLIGATOIRE : Les questions DOIVENT porter EXCLUSIVEMENT sur ces catégories : ${cats}. Ne génère AUCUNE question hors de ces catégories. Varie bien entre elles. ${avoidInstructions}`;
   const prompt=`Génère ${n} questions de culture générale.
 ${catInstructions}
 Niveau de difficulté : ${diffInstructions[diff]||diffInstructions.normal}
@@ -1094,10 +1129,13 @@ RÉPONDS UNIQUEMENT avec ce JSON valide, sans markdown, sans texte avant ou apr�
     const d=await r.json();
     const txt=d.content.map(i=>i.text||'').join('').replace(/```json|```/g,'').trim();
     const generated=JSON.parse(txt).questions.slice(0,n);
-    // Save generated questions to bank for future games
     for(const q of generated){
-      const norm={...q,answers:Array.isArray(q.answers)?q.answers:(q.answer?[q.answer]:[]),answer:Array.isArray(q.answers)?q.answers[0]:q.answer,difficulty:diff,diff,is_custom:false};
-      await saveQuestion(norm).catch(()=>{});
+      // Vérifier qu'elle n'existe pas déjà dans la banque (par le texte de la question)
+      const exists=bankCache.some(b=>b.question&&b.question.toLowerCase().trim()===q.question.toLowerCase().trim());
+      if(!exists){
+        const norm={...q,answers:Array.isArray(q.answers)?q.answers:(q.answer?[q.answer]:[]),answer:Array.isArray(q.answers)?q.answers[0]:q.answer,difficulty:diff,diff,is_custom:false};
+        await saveQuestion(norm).catch(()=>{});
+      }
     }
     return generated;
   }catch{return shuffle(fallback(cats,diff)).slice(0,n);}
@@ -1141,6 +1179,8 @@ function fallback(cats,diff){
 function showQuestion(){
   const q=G.questions[G.qIdx];if(!q){showFinal();return;}
   G.answered=false;G.selAns=null;G.x2Active=false;
+  G.freeAttempts={};
+  G.lastWrongAttempt={};
   document.getElementById('tb-code').textContent=G.code;
   document.getElementById('tb-info').textContent=`Question ${G.qIdx+1}/${G.questions.length}`;
   document.getElementById('tb-players').textContent=G.players.length;
@@ -1153,7 +1193,15 @@ function showQuestion(){
   const tt=document.getElementById('gm-type');tt.style.display=q.type==='image'?'inline-flex':'none';
   // body
   let bodyHtml='';
-  if(q.type==='image'&&q.imageHint)bodyHtml=`<div style="text-align:center;font-size:90px;padding:24px;background:var(--hover);border-radius:16px">${q.imageHint}</div>`;
+  if(q.type==='image'){
+    if(q.image_url){
+      bodyHtml=`<div style="text-align:center;padding:12px;background:var(--hover);border-radius:16px;overflow:hidden">
+        <img src="${q.image_url}" alt="illustration" style="max-width:100%;max-height:280px;border-radius:10px;object-fit:contain" onerror="this.parentElement.innerHTML='${q.imageHint||'🖼'}'"/>
+      </div>`;
+    }else if(q.imageHint){
+      bodyHtml=`<div style="text-align:center;font-size:90px;padding:24px;background:var(--hover);border-radius:16px">${q.imageHint}</div>`;
+    }
+  }
   bodyHtml+=`<div class="qtext">${q.question}</div>`;
   document.getElementById('gm-qbody').innerHTML=bodyHtml;
   // answers
@@ -1265,8 +1313,18 @@ async function submitText(){
 
 // Render FREE mode attempts list
 function renderFreeAttempts(latestVal,isCorrect){
+  // Mettre à jour ma propre dernière mauvaise réponse dans le classement
+  if(!isCorrect&&G.settings.showTries){
+    if(!G.lastWrongAttempt)G.lastWrongAttempt={};
+    G.lastWrongAttempt[G.name]=latestVal;
+    renderGameLB();
+  }
+  if(isCorrect&&G.lastWrongAttempt){
+    delete G.lastWrongAttempt[G.name];
+    renderGameLB();
+  }
   const list=document.getElementById('free-attempts-list');if(!list)return;
-  if(!G.settings.showTries&&!isCorrect)return; // si showTries off, on n'affiche que le succès
+  if(!G.settings.showTries&&!isCorrect)return;
   const me=G.players.find(p=>p.name===G.name)||{name:G.name,avatar:'🎮'};
   const div=document.createElement('div');
   div.className='free-attempt'+(isCorrect?' right':' mine');
@@ -1277,6 +1335,17 @@ function renderFreeAttempts(latestVal,isCorrect){
 
 // Called by realtime when another player submits an attempt (FREE mode)
 function onOtherAttempt(playerName,val,isCorrect){
+  // Mettre à jour la dernière mauvaise réponse dans le classement
+  if(!isCorrect&&G.settings.showTries){
+    if(!G.lastWrongAttempt)G.lastWrongAttempt={};
+    G.lastWrongAttempt[playerName]=val;
+    renderGameLB();
+  }
+  if(isCorrect&&G.lastWrongAttempt){
+    delete G.lastWrongAttempt[playerName];
+    renderGameLB();
+  }
+  // Afficher aussi dans la liste des tentatives sous la question
   if(!G.settings.showTries&&!isCorrect)return;
   const list=document.getElementById('free-attempts-list');if(!list)return;
   const pl=G.players.find(p=>p.name===playerName)||{name:playerName,avatar:'🎮'};
@@ -1310,9 +1379,15 @@ function startNextCd(){
     if(cd<=0){
       clearInterval(G.nextInt);el.style.display='none';
       const isLast=G.qIdx+1>=G.questions.length;
-      G.qIdx++;
-      if(isLast){if(G.isHost&&sb)sb.from('rooms').update({status:'finished'}).eq('code',G.code);showFinalCountdown();}
-      else{if(G.isHost&&sb)sb.from('rooms').update({current_q:G.qIdx,status:'next_question'}).eq('code',G.code);showQuestion();}
+      if(G.isHost){
+        const nextIdx=G.qIdx+1;
+        if(isLast){
+          sb.from('rooms').update({status:'finished',current_q:nextIdx}).eq('code',G.code);
+        }else{
+          sb.from('rooms').update({status:'next_question',current_q:nextIdx}).eq('code',G.code);
+        }
+        // L'hôte attend aussi le signal realtime comme les autres
+      }
       return;
     }
     el.innerHTML=`<div class="next-cd"><span class="nc-lbl">Prochaine question dans</span><span class="nc-num">${cd}</span></div>`;
@@ -1323,14 +1398,19 @@ function startNextCd(){
 
 // FINAL COUNTDOWN 5-4-3-2-1 then show results - shows on a dedicated countdown screen, not the question screen
 function showFinalCountdown(){
-  // Show a simple full-page countdown overlay then reveal final
   clearInterval(G.timerInt);
   document.getElementById('gm-result').innerHTML='';
   document.getElementById('gm-next').style.display='block';
   let cd=5;
   const el=document.getElementById('gm-next');
-  const render=()=>{
-    if(cd<0){clearInterval(G.nextInt);el.style.display='none';showFinal();return;}
+  const render=async()=>{
+    if(cd<0){
+      clearInterval(G.nextInt);el.style.display='none';
+      // Recharger tous les scores depuis Supabase avant d'afficher
+      const{data}=await sb.from('players').select('name,score,avatar,color').eq('room_code',G.code);
+      if(data){data.forEach(p=>{G.scores[p.name]=p.score||0;const pl=G.players.find(x=>x.name===p.name);if(pl){pl.score=p.score;pl.avatar=p.avatar;pl.color=p.color;}});}
+      showFinal();return;
+    }
     el.innerHTML=`<div class="next-cd"><span class="nc-lbl" style="color:var(--warn)">🏆 Résultats dans</span><span class="nc-num" style="color:var(--warn);text-shadow:0 0 30px rgba(255,190,11,.6)">${cd}</span></div>`;
     cd--;
   };
@@ -1364,15 +1444,26 @@ function usePuD2(){
 function spawnPts(txt){const el=document.createElement('div');el.className='pfloat';el.textContent=txt;el.style.cssText='left:50%;top:40%;transform:translateX(-50%)';document.body.appendChild(el);setTimeout(()=>el.remove(),1600);}
 
 // GAME LEADERBOARD
+// Stocke les dernières mauvaises réponses par joueur pour affichage dans le LB
+if(!G.lastWrongAttempt)G.lastWrongAttempt={};
+
 function renderGameLB(){
   const s=sortedPl();const medals=['🥇','🥈','🥉'];const rc=['r1','r2','r3','ro'];
-  document.getElementById('gm-lb').innerHTML=s.slice(0,6).map((p,i)=>`
-    <div class="lbrow ${i===0?'crown':''} ${p.name===G.name?'me':''}">
+  const showTries=G.settings.showTries&&G.settings.mode==='FREE';
+  document.getElementById('gm-lb').innerHTML=s.slice(0,6).map((p,i)=>{
+    const wrong=showTries&&G.lastWrongAttempt[p.name]
+      ?`<div style="font-size:10px;color:var(--err);margin-top:2px;font-style:italic;opacity:.8">❌ ${G.lastWrongAttempt[p.name]}</div>`
+      :'';
+    return`<div class="lbrow ${i===0?'crown':''} ${p.name===G.name?'me':''}">
       <span class="lbrank ${rc[i]||'ro'}">${i<3?medals[i]:i+1}</span>
       <span class="lbav">${p.avatar||'🎮'}</span>
-      <div class="lbnm">${p.name}${p.name===G.name?' ✦':''}</div>
+      <div class="lbnm" style="display:flex;flex-direction:column;gap:0">
+        <span>${p.name}${p.name===G.name?' ✦':''}</span>
+        ${wrong}
+      </div>
       <span class="lbpt">${(G.scores[p.name]||0).toLocaleString()}</span>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 // CHAT
@@ -1503,13 +1594,14 @@ function renderBank(){
   if(!qs.length){el.innerHTML='<div style="text-align:center;padding:40px;color:var(--muted)">Aucune question trouvée</div>';return;}
   el.innerHTML=qs.map(q=>{
     const answers=Array.isArray(q.answers)?q.answers:(q.answer?[q.answer]:[]);
-    const diff=q.difficulty||q.diff||'normal';
     const diffL={easy:'🌱 Facile',normal:'⚡ Normal',expert:'🔥 Expert'};
+    const qCats=Array.isArray(q.categories)?q.categories:[(q.category||'?')];
+    const qDiffs=Array.isArray(q.difficulties)?q.difficulties:[(q.difficulty||q.diff||'normal')];
     return`<div class="bq-card">
       <div class="bq-header">
-        <span class="bq-cat">${q.category||'?'}</span>
-        <span class="bq-diff">${diffL[diff]||diff}</span>
-        ${q.type==='image'?'<span style="font-size:20px">'+(q.imageHint||q.image_hint||'')+'</span>':''}
+        ${qCats.map(c=>`<span class="bq-cat">${c}</span>`).join('')}
+        ${qDiffs.map(d=>`<span class="bq-diff">${diffL[d]||d}</span>`).join('')}
+        ${q.type==='image'?(q.image_url?`<img src="${q.image_url}" style="height:32px;width:48px;object-fit:cover;border-radius:6px;vertical-align:middle" onerror="this.style.display='none'"/>`:`<span style="font-size:20px">${q.imageHint||q.image_hint||'🖼'}</span>`):''}
         ${q.is_custom?'<span style="font-size:10px;color:var(--faint);margin-left:auto">importée</span>':''}
       </div>
       <div class="bq-question">${q.question}</div>
@@ -1561,12 +1653,40 @@ function swBankTab(name,btn){
 // ── Image hint toggle ──
 document.addEventListener('change',function(e){
   if(e.target.id==='bk-add-type'){
-    const hw=document.getElementById('bk-add-hint-wrap');
-    if(hw)hw.style.display=e.target.value==='image'?'':'none';
+    const isImg=e.target.value==='image';
+    const hw=document.getElementById('bk-add-hint-wrap');if(hw)hw.style.display=isImg?'':'none';
+    const uw=document.getElementById('bk-add-url-wrap');if(uw)uw.style.display=isImg?'':'none';
+  }
+});
+// Preview image URL en temps réel
+document.addEventListener('input',function(e){
+  if(e.target.id==='bk-add-url'){
+    const url=e.target.value.trim();
+    const preview=document.getElementById('bk-url-preview');
+    const img=document.getElementById('bk-url-img');
+    if(url&&preview&&img){
+      img.src=url;
+      preview.style.display='block';
+      img.onerror=()=>{preview.style.display='none';};
+    }else if(preview){
+      preview.style.display='none';
+    }
   }
 });
 
 // ── Answer tags ──
+let bankCatTags=[];
+function addCatTag(){
+  const inp=document.getElementById('bk-add-cat');if(!inp)return;
+  const val=inp.value.trim();if(!val)return;
+  if(!bankCatTags.includes(val))bankCatTags.push(val);
+  inp.value='';renderCatTags();
+}
+function removeCatTag(i){bankCatTags.splice(i,1);renderCatTags();}
+function renderCatTags(){
+  const el=document.getElementById('bk-cat-tags');if(!el)return;
+  el.innerHTML=bankCatTags.map((a,i)=>`<span class="ans-tag" style="background:rgba(138,0,196,.15);border-color:rgba(138,0,196,.3);color:var(--pri-l)">${a}<button onclick="removeCatTag(${i})">✕</button></span>`).join('');
+}
 function addAnswerTag(){
   const inp=document.getElementById('bk-add-ans-inp');if(!inp)return;
   const val=inp.value.trim();if(!val)return;
@@ -1581,22 +1701,30 @@ function renderAnswerTags(){
 
 // ── Save manual question ──
 async function saveManualQuestion(){
-  const cat=document.getElementById('bk-add-cat')?.value.trim();
-  const diff=document.getElementById('bk-add-diff')?.value||'normal';
+  // Catégories (tags)
+  if(!bankCatTags.length){toast('⚠ Ajoute au moins une catégorie','err');return;}
+  const categories=[...bankCatTags];
+  const cat=categories[0];
+  // Difficultés (checkboxes)
+  const difficulties=['easy','normal','expert'].filter(d=>document.getElementById('diff-ck-'+d)?.checked);
+  if(!difficulties.length){toast('⚠ Sélectionne au moins une difficulté','err');return;}
+  const diff=difficulties[0];
   const type=document.getElementById('bk-add-type')?.value||'text';
   const hint=document.getElementById('bk-add-hint')?.value.trim()||null;
+  const imageUrl=document.getElementById('bk-add-url')?.value.trim()||null;
   const question=document.getElementById('bk-add-q')?.value.trim();
   const expl=document.getElementById('bk-add-expl')?.value.trim()||null;
   if(!cat){toast('⚠ Entre une catégorie','err');return;}
   if(!question){toast('⚠ Entre la question','err');return;}
   if(!bankAnswerTags.length){toast('⚠ Ajoute au moins une réponse','err');return;}
-  const q={question,answers:bankAnswerTags,answer:bankAnswerTags[0],explanation:expl,category:cat,difficulty:diff,diff,type,imageHint:hint,image_hint:hint,is_custom:true};
+  const q={question,answers:bankAnswerTags,answer:bankAnswerTags[0],explanation:expl,categories,category:cat,difficulties,difficulty:diff,diff,type,imageHint:hint,image_hint:hint,image_url:imageUrl,is_custom:true};
   await saveQuestion(q);
   // Reset
   document.getElementById('bk-add-q').value='';
   document.getElementById('bk-add-ans-inp').value='';
   document.getElementById('bk-add-expl').value='';
   bankAnswerTags=[];renderAnswerTags();
+  bankCatTags=[];renderCatTags();
   updateBankStats();
   toast('✅ Question enregistrée !','ok');
   // Switch to list
@@ -1633,7 +1761,13 @@ async function importFile(file){
     // Normalise fields
     const answers=Array.isArray(raw.answers)?raw.answers:raw.answers?raw.answers.split('|').map(a=>a.trim()):raw.answer?[raw.answer]:[];
     if(!raw.question||!answers.length){fail++;continue;}
-    const q={question:raw.question.trim(),answers,answer:answers[0],explanation:(raw.explanation||raw.expl||raw.info||null),category:(raw.category||raw.categorie||'Général').trim(),difficulty:(raw.difficulty||raw.diff||raw.difficulte||'normal').trim(),diff:(raw.difficulty||raw.diff||raw.difficulte||'normal').trim(),type:(raw.type||'text').trim(),imageHint:raw.imageHint||raw.image_hint||raw.emoji||null,image_hint:raw.imageHint||raw.image_hint||raw.emoji||null,is_custom:true};
+    // Normalise category : string "A|B" ou array ["A","B"] → toujours array
+    const rawCat=raw.category||raw.categorie||'Général';
+    const categories=Array.isArray(rawCat)?rawCat:rawCat.split('|').map(c=>c.trim()).filter(Boolean);
+    // Normalise difficulty : string "easy|normal" ou array → toujours array
+    const rawDiff=raw.difficulty||raw.diff||raw.difficulte||'normal';
+    const difficulties=Array.isArray(rawDiff)?rawDiff:rawDiff.split('|').map(d=>d.trim()).filter(Boolean);
+    const q={question:raw.question.trim(),answers,answer:answers[0],explanation:(raw.explanation||raw.expl||raw.info||null),categories,category:categories[0],difficulties,difficulty:difficulties[0],diff:difficulties[0],type:(raw.type||'text').trim(),imageHint:raw.imageHint||raw.image_hint||raw.emoji||null,image_hint:raw.imageHint||raw.image_hint||raw.emoji||null,image_url:raw.image_url||raw.imageUrl||raw.image||null,is_custom:true};
     await saveQuestion(q);ok++;
     await new Promise(r=>setTimeout(r,50)); // small delay to avoid rate limit
   }
