@@ -1081,8 +1081,16 @@ function subscribeRoom(){
     })
     .on('postgres_changes',{event:'DELETE',schema:'public',table:'players',filter:`room_code=eq.${G.code}`},p=>{
       const name=p.old?.name;
-      if(name&&name!==G.name){
+      if(!name)return;
+      if(name===G.name){
+        // C'est moi qui ai été exclu
+        clearInterval(G.lobbyPoll);
+        if(chan)sb.removeChannel(chan);
+        toast('🚫 Tu as été exclu du salon par l\'hôte','err');
+        setTimeout(()=>go('home'),2000);
+      }else{
         G.players=G.players.filter(x=>x.name!==name);
+        delete G.scores[name];
         renderPlayers();
         renderLobbyAction();
       }
@@ -1110,6 +1118,7 @@ function subscribeRoom(){
         G.scores[pl.name]=pl.score||0;
         renderGameLB();
       }
+      if(G.isHost)checkAllAnswered();
     })
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'messages',filter:`room_code=eq.${G.code}`},p=>{
       const m=p.new;
@@ -1131,16 +1140,32 @@ function openLobby(){
   if(G.lobbyPoll)clearInterval(G.lobbyPoll);
   G.lobbyPoll=setInterval(async()=>{
     if(!sb||!G.code)return;
-    // Joueurs
+    // Joueurs — sync complète pour tout le monde
     const{data:pls}=await sb.from('players').select('*').eq('room_code',G.code);
     if(pls){
       let changed=false;
+      // Détecter nouveaux joueurs
       pls.forEach(p=>{
         if(!G.players.find(x=>x.name===p.name)){
           G.players.push(p);G.scores[p.name]=0;changed=true;
-          toast('👋 '+p.name+' a rejoint !','ok');
+          if(p.name!==G.name)toast('👋 '+p.name+' a rejoint !','ok');
         }
       });
+      // Détecter joueurs supprimés (exclus)
+      const plsNames=new Set(pls.map(p=>p.name));
+      G.players.forEach(p=>{
+        if(!plsNames.has(p.name)){
+          if(p.name===G.name){
+            // Je suis exclu
+            clearInterval(G.lobbyPoll);
+            toast('🚫 Tu as été exclu du salon','err');
+            setTimeout(()=>go('home'),2000);
+          }else{
+            changed=true;
+          }
+        }
+      });
+      G.players=G.players.filter(p=>plsNames.has(p.name));
       if(changed){renderPlayers();renderLobbyAction();}
     }
     // Messages (lobby + jeu = même chat)
@@ -1162,9 +1187,37 @@ function openLobby(){
   },2000);
 }
 function renderPlayers(){
-  document.getElementById('lb-players').innerHTML=G.players.map(p=>`<div class="pchip ${p.isHost?'host':''} ${p.name===G.name?'me':''}"><span class="pav">${p.avatar||'🎮'}</span><div class="pnm">${p.name}</div>${p.isHost?'<div class="prole">Hôte</div>':''}</div>`).join('');
+  document.getElementById('lb-players').innerHTML=G.players.map(p=>`
+    <div class="pchip ${p.isHost?'host':''} ${p.name===G.name?'me':''}">
+      <span class="pav">${p.avatar||'🎮'}</span>
+      <div class="pnm">${p.name}</div>
+      ${p.isHost?'<div class="prole">Hôte</div>':''}
+      ${G.isHost&&!p.isHost&&p.name!==G.name?`<button onclick="kickPlayer('${p.name}')" style="background:none;border:none;cursor:pointer;font-size:14px;color:var(--err);padding:2px;margin-top:4px;display:block;width:100%;text-align:center" title="Exclure">✕</button>`:''}
+    </div>`).join('');
   document.getElementById('lb-pcount').textContent=G.players.length+'/8';
 }
+
+async function kickPlayer(name){
+  if(!G.isHost)return;
+  if(!confirm('Exclure '+name+' du salon ?'))return;
+  // Supprimer le joueur de Supabase
+  await sb.from('players').delete().eq('room_code',G.code).eq('name',name);
+  // Mettre à jour localement
+  G.players=G.players.filter(p=>p.name!==name);
+  delete G.scores[name];
+  renderPlayers();
+  renderLobbyAction();
+  toast('🚫 '+name+' a été exclu','ok');
+  // Notifier via un message système dans le chat
+  await sb.from('messages').insert({
+    room_code:G.code,
+    player_name:'Système',
+    avatar:'⚙',
+    color:'var(--err)',
+    message:name+' a été exclu du salon'
+  });
+}
+
 function renderLobbySettings(){
   const s=G.settings;if(!s||!s.categories)return;
   const mE={MVP:'🎯',Battle:'⚔️',QCM:'🧠',FREE:'✍️'};
@@ -1415,19 +1468,34 @@ function showQuestion(){
 
 // TIMER
 function startTimer(){
-  clearInterval(G.timerInt);G.timeLeft=G.settings.qTime;
+  clearInterval(G.timerInt);
+  G.timeLeft=G.settings.qTime;
   const bar=document.getElementById('gm-tb'),cnt=document.getElementById('gm-tc');
   bar.classList.remove('urg');cnt.classList.remove('urg');
   bar.style.background='linear-gradient(90deg,#2CFF05,#8A00C4)';
-  let last=G.timeLeft;
-  function tick(){
-    cnt.textContent=G.timeLeft;bar.style.width=(G.timeLeft/G.settings.qTime*100)+'%';
-    if(G.timeLeft<=5&&G.timeLeft!==last){sndTick();last=G.timeLeft;}
-    if(G.timeLeft<=5){bar.classList.add('urg');cnt.classList.add('urg');}
-    if(G.timeLeft<=0){clearInterval(G.timerInt);if(!G.answered)timeUp();}
+  G.timerInt=setInterval(()=>{
     G.timeLeft--;
-  }
-  tick();G.timerInt=setInterval(tick,1000);
+    cnt.textContent=Math.max(0,G.timeLeft);
+    bar.style.width=(Math.max(0,G.timeLeft)/G.settings.qTime*100)+'%';
+    if(G.timeLeft<=5){bar.classList.add('urg');cnt.classList.add('urg');sndTick();}
+    if(G.timeLeft<=0){
+      clearInterval(G.timerInt);
+      if(!G.answered){
+        timeUp();
+      }else if(G.isHost){
+        clearInterval(G.allAnsweredPoll);
+        advanceQuestion();
+      }
+      // Non-hôte qui a répondu : attend le signal realtime, on force après 5s de sécurité
+      else if(!G.isHost&&G.answered){
+        setTimeout(()=>{
+          if(G.answered&&!document.getElementById('s-game').classList.contains('active'))return;
+          const el=document.getElementById('gm-next');
+          if(el){el.style.display='block';el.innerHTML=`<div class="next-cd"><span class="nc-lbl">En attente de l'hôte…</span></div>`;}
+        },1000);
+      }
+    }
+  },1000);
 }
 
 // PICK ANSWER (QCM / Battle)
@@ -1442,7 +1510,10 @@ async function pickAns(idx){
   G.dotAns[G.qIdx]=ok?'done':'wrong';
   document.querySelectorAll('.ans-btn').forEach((b,i)=>{b.disabled=true;if(i===q.correct)b.classList.add('right');else if(i===idx&&!ok)b.classList.add('wrong');});
   if(ok){sndOk();spawnPts('+'+pts);}else sndFail();
-  if(sb){try{await sb.from('answers').insert({room_code:G.code,player_name:G.name,question_index:G.qIdx,answer_index:idx,is_correct:ok,points:pts});}catch{} try{await sb.from('players').update({score:G.scores[G.name]}).eq('room_code',G.code).eq('name',G.name);}catch{}}
+  if(sb){
+    try{await sb.from('answers').insert({room_code:G.code,player_name:G.name,question_index:G.qIdx,answer_index:idx,is_correct:ok,points:pts});}catch{}
+    try{await sb.from('players').update({last_answer_at:new Date().toISOString(),score:G.scores[G.name]}).eq('room_code',G.code).eq('name',G.name);}catch{}
+  }
   showResultBox(ok,pts,bonus,q.explanation||'',q.options?.[q.correct]||'');
   if(G.isHost){
     startNextCd();
@@ -1501,7 +1572,10 @@ async function submitText(){
     const acceptedDisplay=Array.isArray(q.answers)&&q.answers.length?q.answers[0]:q.answer;
     if(sb2){sb2.textContent='Bonne réponse : '+acceptedDisplay;sb2.style.background='rgba(255,77,109,.15)';sb2.style.color='#FF4D6D';sb2.disabled=true;}
   }
-  if(sb){try{await sb.from('answers').insert({room_code:G.code,player_name:G.name,question_index:G.qIdx,attempt:val,is_correct:ok,points:pts});}catch{} try{await sb.from('players').update({score:G.scores[G.name]}).eq('room_code',G.code).eq('name',G.name);}catch{}}
+  if(sb){
+    try{await sb.from('answers').insert({room_code:G.code,player_name:G.name,question_index:G.qIdx,attempt:val,is_correct:ok,points:pts});}catch{}
+    try{await sb.from('players').update({last_answer_at:new Date().toISOString(),score:G.scores[G.name]}).eq('room_code',G.code).eq('name',G.name);}catch{}
+  }
   showResultBox(ok,pts,bonus,q.explanation||'',q.answer||'');
   showResultBox(ok,pts,bonus,q.explanation||'',q.answer||'');
   if(G.isHost)startNextCd();;
@@ -1553,17 +1627,22 @@ function onOtherAttempt(playerName,val,isCorrect){
 }
 
 function timeUp(){
-  G.answered=true;clearInterval(G.timerInt);
+  G.answered=true;
+  clearInterval(G.timerInt);
+  clearInterval(G.allAnsweredPoll);
   const q=G.questions[G.qIdx];
   document.querySelectorAll('.ans-btn').forEach((b,i)=>{b.disabled=true;if(i===q.correct)b.classList.add('right');});
   const inp=document.getElementById('ans-inp');if(inp)inp.disabled=true;
   G.dotAns[G.qIdx]='wrong';sndFail();
-  document.getElementById('gm-result').innerHTML=`<div class="rbox time"><span class="ri">⏱</span><div class="rt time">Temps écoulé !</div><div class="rsub">Bonne réponse : ${q.answer||q.options?.[q.correct]||''}</div>${q.explanation?`<div class="qexpl" style="margin-top:10px"><strong>💡 Le saviez-vous ?</strong> ${q.explanation}</div>`:''}</div>`;
+  const acceptedDisplay=Array.isArray(q.answers)&&q.answers.length?q.answers[0]:q.answer;
+  document.getElementById('gm-result').innerHTML=`<div class="rbox time"><span class="ri">⏱</span><div class="rt time">Temps écoulé !</div><div class="rsub">Bonne réponse : ${acceptedDisplay||''}</div>${q.explanation?`<div class="qexpl" style="margin-top:10px"><strong>💡 Le saviez-vous ?</strong> ${q.explanation}</div>`:''}</div>`;
+  const el=document.getElementById('gm-next');
+  if(el){el.style.display='block';el.innerHTML=`<div class="next-cd"><span class="nc-lbl">Prochaine question dans 3s…</span></div>`;}
   if(G.isHost){
-    setTimeout(()=>advanceQuestion(),3000);
-  }else{
-    const el=document.getElementById('gm-next');
-    if(el){el.style.display='block';el.innerHTML=`<div class="next-cd"><span class="nc-lbl">En attente des autres joueurs…</span></div>`;}
+    setTimeout(()=>{
+      clearInterval(G.allAnsweredPoll);
+      advanceQuestion();
+    },3000);
   }
 }
 
@@ -1589,12 +1668,17 @@ function startNextCd(){
 
 async function checkAllAnswered(){
   if(!G.isHost)return false;
+  // Compter localement qui a répondu (via G.dotAns)
+  const localDone=G.players.filter(p=>G.dotAns[G.qIdx]!==undefined||p.name===G.name).length;
+  // Vérifier aussi dans Supabase
   const{data}=await sb.from('answers')
     .select('player_name,is_correct')
     .eq('room_code',G.code)
     .eq('question_index',G.qIdx);
-  if(!data)return false;
-  const answeredNames=new Set(data.filter(a=>a.is_correct).map(a=>a.player_name));
+  const answeredNames=new Set((data||[]).filter(a=>a.is_correct).map(a=>a.player_name));
+  // Ajouter l'hôte s'il a répondu localement
+  if(G.answered)answeredNames.add(G.name);
+  console.log('checkAllAnswered — joueurs:',G.players.map(p=>p.name),'ont répondu:',[...answeredNames]);
   const allAnswered=G.players.length>0&&G.players.every(p=>answeredNames.has(p.name));
   if(allAnswered){
     clearInterval(G.allAnsweredPoll);
@@ -1608,6 +1692,7 @@ async function checkAllAnswered(){
 function advanceQuestion(){
   if(!G.isHost)return;
   clearInterval(G.allAnsweredPoll);G.allAnsweredPoll=null;
+  clearInterval(G.timerInt);
   const isLast=G.qIdx+1>=G.questions.length;
   G.qIdx++;
   if(isLast){
