@@ -901,7 +901,18 @@ let sb=null,chan=null;
 const G={name:'',isHost:false,code:'',players:[],settings:{},questions:[],qIdx:0,scores:{},answered:false,selAns:null,timerInt:null,timeLeft:20,nextInt:null,dotAns:{},pu:{f50:1,x2:1,d2:1},x2Active:false,selMode:'FREE',selDiff:'normal',demoHostPoll:null,demoJoinPoll:null,freeAttempts:{}};
 
 window.addEventListener('DOMContentLoaded',()=>{
-  if(!SUPABASE_URL.startsWith('REMPLACE')){try{sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);}catch{}}
+  if(!SUPABASE_URL.startsWith('REMPLACE')){
+    try{
+      sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+      console.log('✅ Supabase connecté',sb);
+    }catch(e){
+      console.error('❌ Supabase erreur',e);
+    }
+  }else{
+    console.warn('⚠️ Clefs Supabase non configurées');
+  }
+  loadSession();
+  renderAvGrid();
 });
 
 // NAV
