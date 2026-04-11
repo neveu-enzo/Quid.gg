@@ -637,10 +637,6 @@ button.ans-btn:disabled{cursor:default}
             </select>
           </div>
         </div>
-        <div class="form-group" id="bk-add-hint-wrap" style="display:none">
-          <label class="form-label">Emoji / indice image <span style="color:var(--faint);font-weight:400">(optionnel si URL fournie)</span></label>
-          <input class="form-input" id="bk-add-hint" placeholder="Ex : 🗼 ou 🇫🇷"/>
-        </div>
         <div class="form-group" id="bk-add-url-wrap" style="display:none">
           <label class="form-label">URL de l'image <span style="color:var(--faint);font-weight:400">(libre de droit)</span></label>
           <input class="form-input" id="bk-add-url" placeholder="https://upload.wikimedia.org/..."/>
@@ -1297,7 +1293,7 @@ async function fetchQs(cats,n,diff,mode){
           difficulties:[q.difficulty||diff],
           diff:q.difficulty||diff,
           type:q.type||'text',
-          image_hint:q.imageHint||null,
+          image_url:q.image_url||null,
           options:q.options||null,
           correct:q.correct??null,
           is_custom:false
@@ -1343,8 +1339,7 @@ RÉPONDS UNIQUEMENT avec ce JSON valide, sans markdown, sans texte avant ou apr�
           difficulties:[diff],
           diff,
           type:q.type||'text',
-          image_hint:q.imageHint||null,
-          imageHint:q.imageHint||null,
+          image_url:q.image_url||null,
           options:q.options||null,
           correct:q.correct??null,
           is_custom:false
@@ -1413,9 +1408,6 @@ function showQuestion(){
       bodyHtml=`<div style="text-align:center;padding:12px;background:var(--hover);border-radius:16px;overflow:hidden">
         <img src="${q.image_url}" alt="illustration" style="max-width:100%;max-height:280px;border-radius:10px;object-fit:contain" onerror="this.parentElement.innerHTML='${q.imageHint||'🖼'}'"/>
       </div>`;
-    }else if(q.imageHint){
-      bodyHtml=`<div style="text-align:center;font-size:90px;padding:24px;background:var(--hover);border-radius:16px">${q.imageHint}</div>`;
-    }
   }
   bodyHtml+=`<div class="qtext">${q.question}</div>`;
   document.getElementById('gm-qbody').innerHTML=bodyHtml;
@@ -2126,14 +2118,13 @@ async function saveManualQuestion(){
   if(!difficulties.length){toast('⚠ Sélectionne au moins une difficulté','err');return;}
   const diff=difficulties[0];
   const type=document.getElementById('bk-add-type')?.value||'text';
-  const hint=document.getElementById('bk-add-hint')?.value.trim()||null;
   const imageUrl=document.getElementById('bk-add-url')?.value.trim()||null;
   const question=document.getElementById('bk-add-q')?.value.trim();
   const expl=document.getElementById('bk-add-expl')?.value.trim()||null;
   if(!cat){toast('⚠ Entre une catégorie','err');return;}
   if(!question){toast('⚠ Entre la question','err');return;}
   if(!bankAnswerTags.length){toast('⚠ Ajoute au moins une réponse','err');return;}
-  const q={question,answers:bankAnswerTags,answer:bankAnswerTags[0],explanation:expl,categories,category:cat,difficulties,difficulty:diff,diff,type,imageHint:hint,image_hint:hint,image_url:imageUrl,is_custom:true};
+  const q={question,answers:bankAnswerTags,answer:bankAnswerTags[0],explanation:expl,categories,category:cat,difficulties,difficulty:diff,diff,type,image_url:imageUrl,is_custom:true};
   await saveQuestion(q);
   // Reset
   document.getElementById('bk-add-q').value='';
@@ -2183,7 +2174,7 @@ async function importFile(file){
     // Normalise difficulty : string "easy|normal" ou array → toujours array
     const rawDiff=raw.difficulty||raw.diff||raw.difficulte||'normal';
     const difficulties=Array.isArray(rawDiff)?rawDiff:rawDiff.split('|').map(d=>d.trim()).filter(Boolean);
-    const q={question:raw.question.trim(),answers,answer:answers[0],explanation:(raw.explanation||raw.expl||raw.info||null),categories,category:categories[0],difficulties,difficulty:difficulties[0],diff:difficulties[0],type:(raw.type||'text').trim(),imageHint:raw.imageHint||raw.image_hint||raw.emoji||null,image_hint:raw.imageHint||raw.image_hint||raw.emoji||null,image_url:raw.image_url||raw.imageUrl||raw.image||null,is_custom:true};
+    const q={question:raw.question.trim(),answers,answer:answers[0],explanation:(raw.explanation||raw.expl||raw.info||null),categories,category:categories[0],difficulties,difficulty:difficulties[0],diff:difficulties[0],type:(raw.type||'text').trim(),image_url:raw.image_url||raw.imageUrl||raw.image||null,is_custom:true};
     await saveQuestion(q);ok++;
     await new Promise(r=>setTimeout(r,50)); // small delay to avoid rate limit
   }
