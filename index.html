@@ -1395,7 +1395,7 @@ async function pickAns(idx){
   G.dotAns[G.qIdx]=ok?'done':'wrong';
   document.querySelectorAll('.ans-btn').forEach((b,i)=>{b.disabled=true;if(i===q.correct)b.classList.add('right');else if(i===idx&&!ok)b.classList.add('wrong');});
   if(ok){sndOk();spawnPts('+'+pts);}else sndFail();
-  if(sb){await sb.from('answers').insert({room_code:G.code,player_name:G.name,question_index:G.qIdx,answer_index:idx,is_correct:ok,points:pts});await sb.from('players').update({score:G.scores[G.name]}).eq('room_code',G.code).eq('name',G.name);}
+  if(sb){try{await sb.from('answers').insert({room_code:G.code,player_name:G.name,question_index:G.qIdx,answer_index:idx,is_correct:ok,points:pts});}catch{} try{await sb.from('players').update({score:G.scores[G.name]}).eq('room_code',G.code).eq('name',G.name);}catch{}}
   else simOthers();
   showResultBox(ok,pts,bonus,q.explanation||'',q.options?.[q.correct]||'');
   if(G.isHost){
@@ -1433,7 +1433,7 @@ async function submitText(){
     G.freeAttempts[G.name].push(val);
     renderFreeAttempts(val,false);
     // Broadcast attempt via Supabase
-    if(sb)sb.from('answers').insert({room_code:G.code,player_name:G.name,question_index:G.qIdx,attempt:val,is_correct:false,points:0}).catch(()=>{});
+    if(sb)try{await sb.from('answers').insert({room_code:G.code,player_name:G.name,question_index:G.qIdx,attempt:val,is_correct:false,points:0});}catch{}
     return; // ← ne termine PAS la question
   }
 
@@ -1455,7 +1455,7 @@ async function submitText(){
     const acceptedDisplay=Array.isArray(q.answers)&&q.answers.length?q.answers[0]:q.answer;
     if(sb2){sb2.textContent='Bonne réponse : '+acceptedDisplay;sb2.style.background='rgba(255,77,109,.15)';sb2.style.color='#FF4D6D';sb2.disabled=true;}
   }
-  if(sb){await sb.from('answers').insert({room_code:G.code,player_name:G.name,question_index:G.qIdx,attempt:val,is_correct:ok,points:pts});await sb.from('players').update({score:G.scores[G.name]}).eq('room_code',G.code).eq('name',G.name);}
+  if(sb){try{await sb.from('answers').insert({room_code:G.code,player_name:G.name,question_index:G.qIdx,attempt:val,is_correct:ok,points:pts});}catch{} try{await sb.from('players').update({score:G.scores[G.name]}).eq('room_code',G.code).eq('name',G.name);}catch{}}
   else simOthers();
   showResultBox(ok,pts,bonus,q.explanation||'',q.answer||'');
   showResultBox(ok,pts,bonus,q.explanation||'',q.answer||'');
@@ -1515,8 +1515,10 @@ function timeUp(){
   G.dotAns[G.qIdx]='wrong';sndFail();if(!sb)simOthers();
   document.getElementById('gm-result').innerHTML=`<div class="rbox time"><span class="ri">⏱</span><div class="rt time">Temps écoulé !</div><div class="rsub">Bonne réponse : ${q.answer||q.options?.[q.correct]||''}</div>${q.explanation?`<div class="qexpl" style="margin-top:10px"><strong>💡 Le saviez-vous ?</strong> ${q.explanation}</div>`:''}</div>`;
   if(G.isHost){
-    // Timer écoulé → attendre 3s puis passer
     setTimeout(()=>advanceQuestion(),3000);
+  }else{
+    const el=document.getElementById('gm-next');
+    if(el){el.style.display='block';el.innerHTML=`<div class="next-cd"><span class="nc-lbl">En attente des autres joueurs…</span></div>`;}
   }
 }
 
@@ -1528,30 +1530,33 @@ function showResultBox(ok,pts,bonus,expl,correctAns){
 
 // NEXT COUNTDOWN 3-2-1 -> show next question directly
 function startNextCd(){
-  // Marquer que cet joueur a terminé cette question
   G.dotAns[G.qIdx]=G.dotAns[G.qIdx]||'done';
-  // Seul l'hôte gère le passage à la question suivante
-  if(!G.isHost)return;
-  // Vérifier si tous les joueurs ont répondu
-  checkAllAnswered();
+  if(G.isHost){
+    checkAllAnswered();
+  }
+  // Afficher un message d'attente pour tout le monde
+  const el=document.getElementById('gm-next');
+  if(el){
+    el.style.display='block';
+    el.innerHTML=`<div class="next-cd"><span class="nc-lbl">En attente des autres joueurs…</span></div>`;
+  }
 }
 
 async function checkAllAnswered(){
   if(!G.isHost)return;
-  // Compter les réponses pour cette question dans Supabase
+  // Récupérer toutes les bonnes réponses pour cette question
   const{data}=await sb.from('answers')
-    .select('player_name')
+    .select('player_name,is_correct')
     .eq('room_code',G.code)
-    .eq('question_index',G.qIdx)
-    .eq('is_correct',true);
-  const answeredNames=new Set((data||[]).map(a=>a.player_name));
-  const allAnswered=G.players.every(p=>answeredNames.has(p.name));
+    .eq('question_index',G.qIdx);
+  if(!data)return;
+  // Un joueur a "répondu" s'il a au moins une bonne réponse
+  const answeredNames=new Set(data.filter(a=>a.is_correct).map(a=>a.player_name));
+  const allAnswered=G.players.length>0&&G.players.every(p=>answeredNames.has(p.name));
   if(allAnswered){
-    // Tout le monde a répondu → passer immédiatement après 2s
     clearInterval(G.timerInt);
     setTimeout(()=>advanceQuestion(),2000);
   }
-  // Sinon on attend que le timer arrive à 0 (géré dans startTimer → timeUp)
 }
 
 function advanceQuestion(){
@@ -1695,7 +1700,7 @@ function renderGameLB(){
 const CCOLS=['#A020E0','#2CFF05','#FF4D6D','#FFBE0B','#38bdf8','#F472B6'];
 
 // LOBBY CHAT
-function sendLobbyChat(){
+async function sendLobbyChat(){
   const inp=document.getElementById('lb-chat-inp');
   const msg=inp?.value.trim();if(!msg)return;
   inp.value='';
@@ -1703,7 +1708,7 @@ function sendLobbyChat(){
   const color=CCOLS[idx%CCOLS.length];
   const me=G.players.find(p=>p.name===G.name)||{};
   addLobbyChat(G.name,msg,color,me.avatar);
-  if(sb)sb.from('messages').insert({room_code:G.code,player_name:G.name,avatar:me.avatar||'🎮',color,message:msg}).catch(()=>{});
+  if(sb)try{await sb.from('messages').insert({room_code:G.code,player_name:G.name,avatar:me.avatar||'🎮',color,message:msg});}catch{}
 }
 
 function addLobbyChat(name,text,color,avatar){
@@ -1715,7 +1720,7 @@ function addLobbyChat(name,text,color,avatar){
   el.scrollTop=el.scrollHeight;
 }
 
-function sendChat(){
+async function sendChat(){
   const inp=document.getElementById('chat-inp');
   const msg=inp.value.trim();if(!msg)return;
   inp.value='';
@@ -1725,7 +1730,7 @@ function sendChat(){
   // Afficher immédiatement pour soi
   addChat(G.name,msg,color,me.avatar);
   // Envoyer dans Supabase pour les autres
-  if(sb)sb.from('messages').insert({room_code:G.code,player_name:G.name,avatar:me.avatar||'🎮',color,message:msg}).catch(()=>{});
+  if(sb)try{await sb.from('messages').insert({room_code:G.code,player_name:G.name,avatar:me.avatar||'🎮',color,message:msg});}catch{}
 }
 function addChat(name,text,color,avatar){
   const el=document.getElementById('chat-msgs');if(!el)return;
