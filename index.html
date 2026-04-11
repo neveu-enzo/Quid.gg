@@ -857,9 +857,9 @@ button.ans-btn:disabled{cursor:default}
       </div>
     </div>
     <div class="stats-row">
-      <div class="stat-box"><div class="stat-val">4 850</div><div class="stat-lbl">🏆 Meilleur score</div></div>
-      <div class="stat-box"><div class="stat-val">47</div><div class="stat-lbl">🎮 Parties jouées</div></div>
-      <div class="stat-box"><div class="stat-val">73%</div><div class="stat-lbl">✅ Taux de réussite</div></div>
+      <div class="stat-box"><div class="stat-val" id="stat-best">0</div><div class="stat-lbl">🏆 Meilleur score</div></div>
+      <div class="stat-box"><div class="stat-val" id="stat-games">0</div><div class="stat-lbl">🎮 Parties jouées</div></div>
+      <div class="stat-box"><div class="stat-val" id="stat-rate">0%</div><div class="stat-lbl">✅ Taux de réussite</div></div>
     </div>
     <div class="tabs">
       <button class="tab active" onclick="swTab('historique',this)">📋 Historique</button>
@@ -931,6 +931,22 @@ function go(id){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById('s-'+id).classList.add('active');
   document.getElementById('main-nav').style.display=['game','loading'].includes(id)?'none':'flex';
+  if(id==='profile')openProfile();
+}
+
+async function openProfile(){
+  if(!currentUser?.supabaseId||!sb)return;
+  const{data:prof}=await sb.from('profiles').select('*').eq('id',currentUser.supabaseId).single();
+  if(prof){
+    currentUser.profile=prof;saveSession(currentUser);
+    const pn=document.getElementById('prof-name');if(pn)pn.textContent=prof.name;
+    const pa=document.getElementById('prof-av');if(pa)pa.textContent=prof.avatar||'🦊';
+    const el=document.getElementById('stat-best');if(el)el.textContent=(prof.best_score||0).toLocaleString();
+    const eg=document.getElementById('stat-games');if(eg)eg.textContent=prof.games_played||0;
+    const er=document.getElementById('stat-rate');if(er)er.textContent=prof.total_questions>0?Math.round(prof.total_correct/prof.total_questions*100)+'%':'0%';
+  }
+  // Charger l'historique par défaut
+  loadHistory();
 }
 
 // FORM HELPERS
@@ -1009,13 +1025,14 @@ function subscribeRoom(){
     .on('postgres_changes',{event:'UPDATE',schema:'public',table:'rooms',filter:`code=eq.${G.code}`},p=>{
       const r=p.new;
       if(r.status==='playing'){
-        if(!G.isHost){G.questions=r.questions;G.settings=r.settings;}
-        G.qIdx=r.current_q;showQuestion();
+        if(!G.isHost){G.questions=r.questions;G.settings=r.settings;G.qIdx=r.current_q;showQuestion();}
       }
       if(r.status==='next_question'){
-        G.qIdx=r.current_q;showQuestion();
+        if(!G.isHost){G.qIdx=r.current_q;showQuestion();}
       }
-      if(r.status==='finished'){fetchScoresFinal();}
+      if(r.status==='finished'){
+        if(!G.isHost){fetchScoresFinal();}
+      }
     })
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'answers',filter:`room_code=eq.${G.code}`},p=>{
       const a=p.new;if(a.player_name!==G.name){
@@ -1027,6 +1044,12 @@ function subscribeRoom(){
       if(pl.name!==G.name){
         G.scores[pl.name]=pl.score||0;
         renderGameLB();
+      }
+    })
+    .on('postgres_changes',{event:'INSERT',schema:'public',table:'messages',filter:`room_code=eq.${G.code}`},p=>{
+      const m=p.new;
+      if(m.player_name!==G.name){
+        addChat(m.player_name,m.message,m.color||'#A020E0',m.avatar);
       }
     })
     .subscribe();
@@ -1379,14 +1402,13 @@ function startNextCd(){
     if(cd<=0){
       clearInterval(G.nextInt);el.style.display='none';
       const isLast=G.qIdx+1>=G.questions.length;
-      if(G.isHost){
-        const nextIdx=G.qIdx+1;
-        if(isLast){
-          sb.from('rooms').update({status:'finished',current_q:nextIdx}).eq('code',G.code);
-        }else{
-          sb.from('rooms').update({status:'next_question',current_q:nextIdx}).eq('code',G.code);
-        }
-        // L'hôte attend aussi le signal realtime comme les autres
+      G.qIdx++;
+      if(isLast){
+        if(sb)sb.from('rooms').update({status:'finished',current_q:G.qIdx}).eq('code',G.code);
+        showFinalCountdown();
+      }else{
+        if(sb)sb.from('rooms').update({status:'next_question',current_q:G.qIdx}).eq('code',G.code);
+        showQuestion();
       }
       return;
     }
@@ -1397,6 +1419,53 @@ function startNextCd(){
 }
 
 // FINAL COUNTDOWN 5-4-3-2-1 then show results - shows on a dedicated countdown screen, not the question screen
+async function saveGameHistory(){
+  if(!currentUser?.supabaseId||!sb)return;
+  const sorted=sortedPl();
+  const myRank=sorted.findIndex(p=>p.name===G.name)+1;
+  const myScore=G.scores[G.name]||0;
+  const myAnswers=await sb.from('answers').select('is_correct').eq('room_code',G.code).eq('player_name',G.name);
+  const correctCount=(myAnswers.data||[]).filter(a=>a.is_correct).length;
+  // Sauvegarder l'historique
+  await sb.from('game_history').insert({
+    player_name:G.name,
+    player_id:currentUser.supabaseId,
+    room_code:G.code,
+    mode:G.settings.mode,
+    score:myScore,
+    rank:myRank,
+    total_players:G.players.length,
+    questions_count:G.questions.length,
+    correct_count:correctCount,
+    categories:G.settings.categories,
+    difficulty:G.settings.diff
+  });
+  // Mettre à jour le profil
+  const{data:prof}=await sb.from('profiles').select('*').eq('id',currentUser.supabaseId).single();
+  const newBest=Math.max(myScore,prof?.best_score||0);
+  await sb.from('profiles').update({
+    best_score:newBest,
+    games_played:(prof?.games_played||0)+1,
+    total_correct:(prof?.total_correct||0)+correctCount,
+    total_questions:(prof?.total_questions||0)+G.questions.length,
+    updated_at:new Date().toISOString()
+  }).eq('id',currentUser.supabaseId);
+  // Mettre à jour currentUser
+  currentUser.profile={...prof,best_score:newBest,games_played:(prof?.games_played||0)+1};
+  saveSession(currentUser);
+  // Sauvegarder les joueurs récents
+  for(const p of G.players){
+    if(p.name!==G.name){
+      await sb.from('recent_players').upsert({
+        user_id:currentUser.supabaseId,
+        met_player_name:p.name,
+        met_player_avatar:p.avatar||'🎮',
+        room_code:G.code,
+        played_at:new Date().toISOString()
+      },{onConflict:'user_id,met_player_name'});
+    }
+  }
+}
 function showFinalCountdown(){
   clearInterval(G.timerInt);
   document.getElementById('gm-result').innerHTML='';
@@ -1406,9 +1475,9 @@ function showFinalCountdown(){
   const render=async()=>{
     if(cd<0){
       clearInterval(G.nextInt);el.style.display='none';
-      // Recharger tous les scores depuis Supabase avant d'afficher
       const{data}=await sb.from('players').select('name,score,avatar,color').eq('room_code',G.code);
       if(data){data.forEach(p=>{G.scores[p.name]=p.score||0;const pl=G.players.find(x=>x.name===p.name);if(pl){pl.score=p.score;pl.avatar=p.avatar;pl.color=p.color;}});}
+      await saveGameHistory();
       showFinal();return;
     }
     el.innerHTML=`<div class="next-cd"><span class="nc-lbl" style="color:var(--warn)">🏆 Résultats dans</span><span class="nc-num" style="color:var(--warn);text-shadow:0 0 30px rgba(255,190,11,.6)">${cd}</span></div>`;
@@ -1468,8 +1537,26 @@ function renderGameLB(){
 
 // CHAT
 const CCOLS=['#A020E0','#2CFF05','#FF4D6D','#FFBE0B','#38bdf8','#F472B6'];
-function sendChat(){const inp=document.getElementById('chat-inp');const msg=inp.value.trim();if(!msg)return;inp.value='';addChat(G.name,msg,CCOLS[G.players.findIndex(p=>p.name===G.name)%CCOLS.length]);}
-function addChat(name,text,color){const el=document.getElementById('chat-msgs');if(!el)return;const d=document.createElement('div');d.className='cmsg';d.innerHTML=`<span class="cn" style="color:${color||'#A020E0'}">${name}</span><span class="ct"> ${text}</span>`;el.appendChild(d);el.scrollTop=el.scrollHeight;}
+function sendChat(){
+  const inp=document.getElementById('chat-inp');
+  const msg=inp.value.trim();if(!msg)return;
+  inp.value='';
+  const idx=G.players.findIndex(p=>p.name===G.name);
+  const color=CCOLS[idx%CCOLS.length];
+  const me=G.players.find(p=>p.name===G.name)||{};
+  // Afficher immédiatement pour soi
+  addChat(G.name,msg,color,me.avatar);
+  // Envoyer dans Supabase pour les autres
+  if(sb)sb.from('messages').insert({room_code:G.code,player_name:G.name,avatar:me.avatar||'🎮',color,message:msg}).catch(()=>{});
+}
+function addChat(name,text,color,avatar){
+  const el=document.getElementById('chat-msgs');if(!el)return;
+  const d=document.createElement('div');
+  d.className='cmsg';
+  d.innerHTML=`<span style="font-size:13px;margin-right:2px">${avatar||'🎮'}</span><span class="cn" style="color:${color||'#A020E0'}">${name}</span><span class="ct"> ${text}</span>`;
+  el.appendChild(d);
+  el.scrollTop=el.scrollHeight;
+}
 
 // INTER-Q LEADERBOARD
 async function interLB(){
@@ -1522,8 +1609,16 @@ async function leaveRoom(){
   if(G.demoJoinPoll){clearInterval(G.demoJoinPoll);}
   await sb.from('players').delete().eq('room_code',G.code).eq('name',G.name);
   if(chan)sb.removeChannel(chan);
+  // Vérifier s'il reste des joueurs, sinon supprimer le salon
+  const{data:remaining}=await sb.from('players').select('id').eq('room_code',G.code);
+  if(!remaining||remaining.length===0){
+    await sb.from('messages').delete().eq('room_code',G.code);
+    await sb.from('answers').delete().eq('room_code',G.code);
+    await sb.from('rooms').delete().eq('code',G.code);
+  }
   Object.assign(G,{name:'',isHost:false,code:'',players:[],settings:{},questions:[],qIdx:0,scores:{},answered:false,selAns:null,timerInt:null,timeLeft:20,nextInt:null,dotAns:{},pu:{f50:1,x2:1,d2:1},x2Active:false,demoHostPoll:null,demoJoinPoll:null,freeAttempts:{}});
   go('home');window.scrollTo({top:0,behavior:'smooth'});
+  if(sb)await sb.from('messages').delete().eq('room_code',G.code);
 }
 function sortedPl(){return[...G.players].sort((a,b)=>(G.scores[b.name]||0)-(G.scores[a.name]||0));}
 
@@ -1557,10 +1652,19 @@ async function saveQuestion(q){
   if(sb){
     try{
       const{data,error}=await sb.from('questions_bank').insert([q]).select().single();
-      if(!error&&data){bankCache.unshift(data);return data;}
-    }catch{}
+      if(!error&&data){
+        bankCache.unshift(data);
+        // Sync localStorage aussi
+        const local=bankGet();local.unshift(data);bankSave(local);
+        return data;
+      }
+      if(error)console.error('saveQuestion error:',error.message,error.details);
+    }catch(e){console.error('saveQuestion catch:',e);}
   }
-  const local=bankGet();q.id=Date.now().toString(36)+Math.random().toString(36).slice(2);q.is_custom=true;q.created_at=new Date().toISOString();
+  // Fallback localStorage
+  const local=bankGet();
+  q.id=Date.now().toString(36)+Math.random().toString(36).slice(2);
+  q.is_custom=true;q.created_at=new Date().toISOString();
   local.unshift(q);bankSave(local);bankCache=local;return q;
 }
 
@@ -1877,6 +1981,8 @@ async function doSignup(){
           setBtnLoading('signup-btn',false);return;
         }
         currentUser={name,email,avatar:'🦊',supabaseId:data.user.id};
+        // Créer le profil en base
+        await sb.from('profiles').upsert({id:data.user.id,name,avatar:'🦊'});
         saveSession(currentUser);updateNav();
         setBtnLoading('signup-btn',false);
         go('home');toast('🎉 Bienvenue '+name+' !','ok');return;
@@ -1919,10 +2025,12 @@ async function doLogin(){
       if(error){setAuthError('login-err','❌ E-mail ou mot de passe incorrect.');setBtnLoading('login-btn',false);return;}
       if(data.user){
         const name=data.user.user_metadata?.name||email.split('@')[0];
-        currentUser={name,email,avatar:'🦊',supabaseId:data.user.id};
-        saveSession(currentUser);updateNav();
-        setBtnLoading('login-btn',false);
-        go('home');toast('✅ Connecté en tant que '+name,'ok');return;
+        // Charger le profil depuis Supabase
+      const{data:prof}=await sb.from('profiles').select('*').eq('id',data.user.id).single();
+      currentUser={name:prof?.name||name,email,avatar:prof?.avatar||'🦊',supabaseId:data.user.id,profile:prof};
+      saveSession(currentUser);updateNav();
+      setBtnLoading('login-btn',false);
+      go('home');toast('✅ Bienvenue '+currentUser.name+' !','ok');return;
       }
     }catch(e){
       // Supabase not configured, fall through
@@ -1968,6 +2076,13 @@ function updateNav(){
     // Update profile page
     const pn=document.getElementById('prof-name');if(pn)pn.textContent=currentUser.name;
     const pa=document.getElementById('prof-av');if(pa)pa.textContent=currentUser.avatar||'🦊';
+    // Recharger les stats du profil si disponibles
+    if(currentUser.profile){
+      const p=currentUser.profile;
+      const el=document.getElementById('stat-best');if(el)el.textContent=(p.best_score||0).toLocaleString();
+      const eg=document.getElementById('stat-games');if(eg)eg.textContent=p.games_played||0;
+      const er=document.getElementById('stat-rate');if(er)er.textContent=p.total_questions>0?Math.round(p.total_correct/p.total_questions*100)+'%':'0%';
+    }
   }else{
     if(pb)pb.style.display='none';
     const bankBtn=document.getElementById('nav-bank-btn');if(bankBtn)bankBtn.style.display='none';
@@ -1988,8 +2103,131 @@ let selAv='🦊';
 function renderAvGrid(){const g=document.getElementById('av-grid');if(!g)return;g.innerHTML=ALL_AVS.map(av=>`<div class="av-opt ${av===selAv?'sel':''}" onclick="pickAv('${av}')">${av}</div>`).join('');}
 function pickAv(av){selAv=av;renderAvGrid();}
 function openAvPicker(){const m=document.getElementById('av-picker-modal');m.style.display='block';m.scrollIntoView({behavior:'smooth',block:'nearest'});}
-function closeAvPicker(){document.getElementById('av-picker-modal').style.display='none';document.getElementById('prof-av').textContent=selAv;toast('✅ Avatar mis à jour !');}
-function swTab(name,btn){document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));document.querySelectorAll('.tc').forEach(t=>t.classList.remove('active'));btn.classList.add('active');document.getElementById('tab-'+name).classList.add('active');}
+async function closeAvPicker(){
+  document.getElementById('av-picker-modal').style.display='none';
+  document.getElementById('prof-av').textContent=selAv;
+  if(currentUser){
+    currentUser.avatar=selAv;saveSession(currentUser);
+    if(sb&&currentUser.supabaseId)await sb.from('profiles').update({avatar:selAv}).eq('id',currentUser.supabaseId);
+  }
+  toast('✅ Avatar mis à jour !');
+}
+function swTab(name,btn){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.tc').forEach(t=>t.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tab-'+name).classList.add('active');
+  if(name==='historique')loadHistory();
+  if(name==='amis')loadFriends();
+  if(name==='recents')loadRecents();
+}
+
+async function loadHistory(){
+  if(!currentUser?.supabaseId||!sb)return;
+  const el=document.getElementById('tab-historique');if(!el)return;
+  el.innerHTML='<div style="text-align:center;padding:20px;color:var(--muted)">Chargement…</div>';
+  const{data}=await sb.from('game_history').select('*').eq('player_id',currentUser.supabaseId).order('played_at',{ascending:false}).limit(20);
+  if(!data||!data.length){el.innerHTML='<div style="text-align:center;padding:20px;color:var(--muted)">Aucune partie jouée pour l\'instant</div>';return;}
+  const modeIcons={FREE:'✍️',QCM:'🧠',MVP:'🎯',Battle:'⚔️'};
+  const modeBg={FREE:'rgba(44,255,5,.08)',QCM:'rgba(138,0,196,.15)',MVP:'rgba(56,189,248,.1)',Battle:'rgba(255,77,109,.12)'};
+  const rankEmoji=r=>r===1?'🥇':r===2?'🥈':r===3?'🥉':`${r}ème`;
+  el.innerHTML=data.map(h=>{
+    const date=new Date(h.played_at);
+    const dateStr=date.toLocaleDateString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+    const isWin=h.rank===1;
+    return`<div class="hi">
+      <div class="hi-mode" style="background:${modeBg[h.mode]||'rgba(138,0,196,.15)'}">${modeIcons[h.mode]||'🎮'}</div>
+      <div class="hi-info">
+        <div class="hi-nm">${h.mode} · ${(h.categories||[]).join(', ')||'Général'}</div>
+        <div class="hi-sub">${dateStr} · ${h.questions_count} questions · ${h.difficulty==='easy'?'Facile':h.difficulty==='expert'?'Expert':'Normal'}</div>
+      </div>
+      <div style="text-align:right">
+        <div class="hi-pts" style="color:${isWin?'var(--acc)':'var(--pri-l)'}">${(h.score||0).toLocaleString()} pts</div>
+        <div class="hi-rank">${rankEmoji(h.rank)} / ${h.total_players}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function loadFriends(){
+  if(!currentUser?.supabaseId||!sb)return;
+  const el=document.getElementById('tab-amis');if(!el)return;
+  el.innerHTML='<div style="text-align:center;padding:20px;color:var(--muted)">Chargement…</div>';
+  const{data}=await sb.from('friendships').select('*,friend:friend_id(id,name,avatar)').eq('user_id',currentUser.supabaseId).eq('status','accepted');
+  const{data:pending}=await sb.from('friendships').select('*,requester:user_id(id,name,avatar)').eq('friend_id',currentUser.supabaseId).eq('status','pending');
+  let html=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+    <span style="font-size:13px;color:var(--muted)">${(data||[]).length} ami(s)</span>
+    <div style="display:flex;gap:8px">
+      <input class="form-input" id="friend-search-inp" placeholder="Pseudo de l'ami…" style="padding:8px 12px;font-size:13px;width:180px"/>
+      <button class="btn btn-outline" style="padding:8px 14px;font-size:13px" onclick="addFriend()">+ Ajouter</button>
+    </div>
+  </div>`;
+  if(pending?.length){
+    html+=`<div style="font-size:12px;font-weight:700;color:var(--warn);margin-bottom:8px;text-transform:uppercase;letter-spacing:.8px">Demandes reçues</div>`;
+    html+=pending.map(f=>`<div class="frd">
+      <div class="frd-av">${f.requester?.avatar||'🎮'}</div>
+      <div class="frd-info"><div class="frd-nm">${f.requester?.name||'?'}</div><div class="frd-sub">Veut être ton ami</div></div>
+      <button class="btn btn-acc" style="padding:6px 12px;font-size:12px" onclick="acceptFriend('${f.id}')">✓ Accepter</button>
+    </div>`).join('');
+  }
+  if(!data?.length&&!pending?.length){el.innerHTML=html+'<div style="text-align:center;padding:20px;color:var(--muted)">Aucun ami pour l\'instant</div>';return;}
+  html+=(data||[]).map(f=>`<div class="frd">
+    <div class="frd-av">${f.friend?.avatar||'🎮'}</div>
+    <div class="frd-info"><div class="frd-nm">${f.friend?.name||'?'}</div><div class="frd-sub">Ami</div></div>
+    <button class="btn btn-danger" style="padding:6px 12px;font-size:12px" onclick="removeFriend('${f.id}')">Retirer</button>
+  </div>`).join('');
+  el.innerHTML=html;
+}
+
+async function loadRecents(){
+  if(!currentUser?.supabaseId||!sb)return;
+  const el=document.getElementById('tab-recents');if(!el)return;
+  el.innerHTML='<div style="text-align:center;padding:20px;color:var(--muted)">Chargement…</div>';
+  const{data}=await sb.from('recent_players').select('*').eq('user_id',currentUser.supabaseId).order('played_at',{ascending:false}).limit(20);
+  if(!data?.length){el.innerHTML='<div style="text-align:center;padding:20px;color:var(--muted)">Aucun joueur récent</div>';return;}
+  const{data:friends}=await sb.from('friendships').select('friend_id').eq('user_id',currentUser.supabaseId).eq('status','accepted');
+  const friendNames=new Set((friends||[]).map(f=>f.friend_id));
+  const dateStr=d=>new Date(d).toLocaleDateString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+  el.innerHTML=`<div style="font-size:13px;color:var(--muted);margin-bottom:14px">Joueurs rencontrés récemment</div>`+data.map(r=>`<div class="frd">
+    <div class="frd-av">${r.met_player_avatar||'🎮'}</div>
+    <div class="frd-info"><div class="frd-nm">${r.met_player_name}</div><div class="frd-sub">Joué le ${dateStr(r.played_at)}</div></div>
+    <button class="btn btn-outline" style="padding:6px 12px;font-size:12px" onclick="addFriendByName('${r.met_player_name}')">+ Ami</button>
+  </div>`).join('');
+}
+
+async function addFriend(){
+  const inp=document.getElementById('friend-search-inp');
+  const name=inp?.value.trim();if(!name){toast('⚠ Entre un pseudo','err');return;}
+  const{data:prof}=await sb.from('profiles').select('id,name').eq('name',name).single();
+  if(!prof){toast('❌ Joueur introuvable','err');return;}
+  if(prof.id===currentUser.supabaseId){toast('❌ Tu ne peux pas t\'ajouter toi-même','err');return;}
+  const{error}=await sb.from('friendships').insert({user_id:currentUser.supabaseId,friend_id:prof.id,status:'pending'});
+  if(error){toast('❌ Demande déjà envoyée','err');return;}
+  toast('✅ Demande envoyée à '+name,'ok');if(inp)inp.value='';
+}
+
+async function addFriendByName(name){
+  const{data:prof}=await sb.from('profiles').select('id,name').eq('name',name).single();
+  if(!prof){toast('❌ Joueur introuvable','err');return;}
+  const{error}=await sb.from('friendships').insert({user_id:currentUser.supabaseId,friend_id:prof.id,status:'pending'});
+  if(error){toast('❌ Demande déjà envoyée ou déjà ami','err');return;}
+  toast('✅ Demande envoyée à '+name,'ok');loadRecents();
+}
+
+async function acceptFriend(friendshipId){
+  await sb.from('friendships').update({status:'accepted'}).eq('id',friendshipId);
+  // Créer la relation inverse aussi
+  const{data:f}=await sb.from('friendships').select('*').eq('id',friendshipId).single();
+  if(f)await sb.from('friendships').upsert({user_id:f.friend_id,friend_id:f.user_id,status:'accepted'},{onConflict:'user_id,friend_id'});
+  toast('✅ Ami ajouté !','ok');loadFriends();
+}
+
+async function removeFriend(friendshipId){
+  const{data:f}=await sb.from('friendships').select('*').eq('id',friendshipId).single();
+  await sb.from('friendships').delete().eq('id',friendshipId);
+  if(f)await sb.from('friendships').delete().eq('user_id',f.friend_id).eq('friend_id',f.user_id);
+  toast('Ami retiré','ok');loadFriends();
+}
 
 // TOAST
 function toast(msg,type){document.querySelectorAll('.toast').forEach(t=>t.remove());const el=document.createElement('div');el.className='toast '+(type||'');el.textContent=msg;document.body.appendChild(el);setTimeout(()=>{el.style.opacity='0';},2500);setTimeout(()=>el.remove(),3000);}
