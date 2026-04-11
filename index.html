@@ -853,45 +853,46 @@ button.ans-btn:disabled{cursor:default}
 <div id="s-profile" class="screen">
   <div class="page-wrap">
     <div class="page-back"><button class="btn-icon" onclick="go('home')">←</button><h2 class="page-title">Mon Profil</h2></div>
+
+    <!-- Header profil -->
     <div class="prof-hdr">
       <div class="prof-av-wrap">
         <div class="prof-av" id="prof-av" onclick="openAvPicker()">🦊</div>
         <div class="prof-av-ed" onclick="openAvPicker()">✏</div>
       </div>
       <div class="prof-info">
-        <div class="prof-name" id="prof-name">NightOwl</div>
-        <div class="prof-sub">Membre depuis avril 2025 · <span style="color:var(--acc)">Niveau 12</span></div>
-        <div class="prof-badges"><span class="pbadge">🏆 Top 10%</span><span class="pbadge">⚡ Speedster</span><span class="pbadge">🧠 Cultissime</span></div>
-      <button class="btn btn-ghost" style="margin-top:14px;padding:8px 18px;font-size:13px;color:var(--err);border-color:rgba(255,77,109,.3)" onclick="doLogout()">🚪 Se déconnecter</button>
+        <div class="prof-name" id="prof-name">—</div>
+        <div class="prof-sub" id="prof-sub">Chargement…</div>
+        <div class="prof-badges" id="prof-badges"></div>
+        <button class="btn btn-ghost" style="margin-top:14px;padding:8px 18px;font-size:13px;color:var(--err);border-color:rgba(255,77,109,.3)" onclick="doLogout()">🚪 Se déconnecter</button>
       </div>
     </div>
+
+    <!-- Stats -->
     <div class="stats-row">
-      <div class="stat-box"><div class="stat-val" id="stat-best">0</div><div class="stat-lbl">🏆 Meilleur score</div></div>
-      <div class="stat-box"><div class="stat-val" id="stat-games">0</div><div class="stat-lbl">🎮 Parties jouées</div></div>
-      <div class="stat-box"><div class="stat-val" id="stat-rate">0%</div><div class="stat-lbl">✅ Taux de réussite</div></div>
+      <div class="stat-box"><div class="stat-val" id="stat-best">—</div><div class="stat-lbl">🏆 Meilleur score</div></div>
+      <div class="stat-box"><div class="stat-val" id="stat-games">—</div><div class="stat-lbl">🎮 Parties jouées</div></div>
+      <div class="stat-box"><div class="stat-val" id="stat-rate">—</div><div class="stat-lbl">✅ Taux de réussite</div></div>
     </div>
+
+    <!-- Tabs -->
     <div class="tabs">
       <button class="tab active" onclick="swTab('historique',this)">📋 Historique</button>
       <button class="tab" onclick="swTab('amis',this)">👥 Amis</button>
       <button class="tab" onclick="swTab('recents',this)">⏱ Récents</button>
     </div>
+
     <div class="tc active" id="tab-historique">
-      <div class="hi"><div class="hi-mode" style="background:rgba(138,0,196,.15)">🧠</div><div class="hi-info"><div class="hi-nm">QCM · Géographie &amp; Histoire</div><div class="hi-sub">Il y a 2 heures · 10 questions · Normal</div></div><div style="text-align:right"><div class="hi-pts">3 240 pts</div><div class="hi-rank">🥈 2ème / 6</div></div></div>
-      <div class="hi"><div class="hi-mode" style="background:rgba(255,77,109,.12)">⚔️</div><div class="hi-info"><div class="hi-nm">Battle · Général</div><div class="hi-sub">Hier · 15 questions · Expert</div></div><div style="text-align:right"><div class="hi-pts" style="color:var(--acc)">4 850 pts</div><div class="hi-rank">🥇 1er / 2</div></div></div>
-      <div class="hi"><div class="hi-mode" style="background:rgba(44,255,5,.08)">✍️</div><div class="hi-info"><div class="hi-nm">FREE · Culture Pop &amp; Musique</div><div class="hi-sub">Il y a 3 jours · 10 questions · Facile</div></div><div style="text-align:right"><div class="hi-pts">1 980 pts</div><div class="hi-rank">🥉 3ème / 8</div></div></div>
-      <div class="hi"><div class="hi-mode" style="background:rgba(56,189,248,.1)">🎯</div><div class="hi-info"><div class="hi-nm">MVP · Sciences &amp; Géographie</div><div class="hi-sub">Il y a 5 jours · Solo · Normal</div></div><div style="text-align:right"><div class="hi-pts">2 670 pts</div><div class="hi-rank">Score perso</div></div></div>
+      <div style="text-align:center;padding:30px;color:var(--muted)" id="hist-loading">Chargement…</div>
     </div>
     <div class="tc" id="tab-amis">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><span style="font-size:13px;color:var(--muted)">12 amis</span><button class="btn btn-outline" style="padding:8px 16px;font-size:13px">+ Ajouter un ami</button></div>
-      <div class="frd"><div class="frd-av">🦁</div><div class="frd-info"><div class="frd-nm">Léo</div><div class="frd-sub">En jeu · QCM</div></div><div class="frd-dot on"></div></div>
-      <div class="frd"><div class="frd-av">🐬</div><div class="frd-info"><div class="frd-nm">Inès</div><div class="frd-sub">En ligne</div></div><div class="frd-dot on"></div></div>
-      <div class="frd"><div class="frd-av">🐺</div><div class="frd-info"><div class="frd-nm">Maxime</div><div class="frd-sub">Hors ligne · Il y a 2h</div></div><div class="frd-dot off"></div></div>
+      <div style="text-align:center;padding:30px;color:var(--muted)">Chargement…</div>
     </div>
     <div class="tc" id="tab-recents">
-      <div style="font-size:13px;color:var(--muted);margin-bottom:14px">Personnes jouées récemment</div>
-      <div class="frd"><div class="frd-av">🐸</div><div class="frd-info"><div class="frd-nm">Théo</div><div class="frd-sub">Joué il y a 2 heures</div></div><button class="btn btn-outline" style="padding:6px 14px;font-size:12px">+ Ajouter</button></div>
-      <div class="frd"><div class="frd-av">🦋</div><div class="frd-info"><div class="frd-nm">Camille</div><div class="frd-sub">Joué hier</div></div><button class="btn btn-outline" style="padding:6px 14px;font-size:12px">+ Ajouter</button></div>
+      <div style="text-align:center;padding:30px;color:var(--muted)">Chargement…</div>
     </div>
+
+    <!-- Avatar picker -->
     <div id="av-picker-modal" style="display:none" class="card">
       <div class="card-title">🎨 Choisir un avatar</div>
       <div class="av-picker-grid" id="av-grid"></div>
@@ -928,7 +929,7 @@ try{
 }catch(e){
   console.error('❌ Supabase erreur',e);
 }
-const G={name:'',isHost:false,code:'',players:[],settings:{},questions:[],qIdx:0,scores:{},answered:false,selAns:null,timerInt:null,timeLeft:20,nextInt:null,dotAns:{},pu:{f50:1,x2:1,d2:1},x2Active:false,selMode:'FREE',selDiff:'normal',demoHostPoll:null,demoJoinPoll:null,freeAttempts:{}};
+const G={name:'',isHost:false,code:'',players:[],settings:{},questions:[],qIdx:0,scores:{},answered:false,selAns:null,timerInt:null,timeLeft:20,nextInt:null,dotAns:{},pu:{f50:1,x2:1,d2:1},x2Active:false,selMode:'FREE',selDiff:'normal',freeAttempts:{},lastWrongAttempt:{},lobbyPoll:null,chatPoll:null,allAnsweredPoll:null};
 
 window.addEventListener('DOMContentLoaded',()=>{
   loadSession();
@@ -941,18 +942,51 @@ function go(id){
   document.getElementById('s-'+id).classList.add('active');
   document.getElementById('main-nav').style.display=['game','loading'].includes(id)?'none':'flex';
   if(id==='profile')openProfile();
+  if(id==='create-room'||id==='join-room'){
+    // Pré-remplir le pseudo avec le profil connecté
+    if(currentUser){
+      const crName=document.getElementById('cr-name');
+      const jrName=document.getElementById('jr-name');
+      if(crName&&!crName.value)crName.value=currentUser.name||'';
+      if(jrName&&!jrName.value)jrName.value=currentUser.name||'';
+    }
+  }
 }
 
 async function openProfile(){
-  if(!currentUser?.supabaseId||!sb)return;
-  const{data:prof}=await sb.from('profiles').select('*').eq('id',currentUser.supabaseId).single();
-  if(prof){
-    currentUser.profile=prof;saveSession(currentUser);
-    const pn=document.getElementById('prof-name');if(pn)pn.textContent=prof.name;
-    const pa=document.getElementById('prof-av');if(pa)pa.textContent=prof.avatar||'🦊';
-    const el=document.getElementById('stat-best');if(el)el.textContent=(prof.best_score||0).toLocaleString();
-    const eg=document.getElementById('stat-games');if(eg)eg.textContent=prof.games_played||0;
-    const er=document.getElementById('stat-rate');if(er)er.textContent=prof.total_questions>0?Math.round(prof.total_correct/prof.total_questions*100)+'%':'0%';
+  if(!currentUser){go('login');return;}
+  // Afficher les infos de base immédiatement depuis la session
+  const pa=document.getElementById('prof-av');if(pa)pa.textContent=currentUser.avatar||'🦊';
+  const pn=document.getElementById('prof-name');if(pn)pn.textContent=currentUser.name||'—';
+  // Charger depuis Supabase si connecté
+  if(sb&&currentUser.supabaseId){
+    const{data:prof}=await sb.from('profiles').select('*').eq('id',currentUser.supabaseId).single();
+    if(prof){
+      currentUser.profile=prof;
+      currentUser.avatar=prof.avatar||currentUser.avatar;
+      saveSession(currentUser);
+      if(pa)pa.textContent=prof.avatar||'🦊';
+      if(pn)pn.textContent=prof.name||'—';
+      // Sous-titre
+      const ps=document.getElementById('prof-sub');
+      if(ps){
+        const since=new Date(prof.created_at).toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
+        ps.textContent='Membre depuis '+since;
+      }
+      // Stats
+      const eb=document.getElementById('stat-best');if(eb)eb.textContent=(prof.best_score||0).toLocaleString()+' pts';
+      const eg=document.getElementById('stat-games');if(eg)eg.textContent=prof.games_played||0;
+      const er=document.getElementById('stat-rate');
+      if(er)er.textContent=prof.total_questions>0?Math.round(prof.total_correct/prof.total_questions*100)+'%':'0%';
+      // Badges dynamiques
+      const badges=[];
+      if((prof.games_played||0)>=1)badges.push('🎮 Joueur');
+      if((prof.games_played||0)>=10)badges.push('⚡ Régulier');
+      if((prof.best_score||0)>=1000)badges.push('🏆 Scoreur');
+      if((prof.total_questions||0)>0&&Math.round(prof.total_correct/prof.total_questions*100)>=80)badges.push('🧠 Expert');
+      const pb=document.getElementById('prof-badges');
+      if(pb)pb.innerHTML=badges.map(b=>`<span class="pbadge">${b}</span>`).join('');
+    }
   }
   // Charger l'historique par défaut
   loadHistory();
@@ -993,9 +1027,11 @@ async function createRoom(){
   G.code=Math.floor(1000+Math.random()*9000).toString();
   G.settings={mode:G.selMode,diff:G.selDiff,categories:cats,qCount:+document.getElementById('cr-qcount').value,qTime:+document.getElementById('cr-qtime').value,powerups:G.selMode!=='FREE'||!!(document.getElementById('cr-powerups')&&document.getElementById('cr-powerups').checked),showTries:G.selMode==='FREE'&&!!(document.getElementById('cr-showtries')&&document.getElementById('cr-showtries').checked)};
   G.players=[];
+  const myAvatar=currentUser?.avatar||AVATARS[0];
+  const myColor=currentUser?.color||COLORS[0];
   G.scores={[name]:0};
   await sb.from('rooms').insert({code:G.code,host_name:name,settings:G.settings,status:'waiting',questions:null,current_q:0});
-  await sb.from('players').insert({room_code:G.code,name,avatar:AVATARS[0],color:COLORS[0],score:0});
+  await sb.from('players').insert({room_code:G.code,name,avatar:myAvatar,color:myColor,score:0});
   subscribeRoom();
   // Recharger les joueurs depuis Supabase pour être sûr
   const{data:pls}=await sb.from('players').select('*').eq('room_code',G.code);
@@ -1019,7 +1055,9 @@ async function joinRoom(){
   const{data:pls}=await sb.from('players').select('*').eq('room_code',code);
   G.players=pls||[];G.players.forEach(p=>G.scores[p.name]=p.score||0);
   const idx=G.players.length;
-  const me={name,avatar:AVATARS[idx%AVATARS.length],color:COLORS[idx%COLORS.length],score:0};
+  const myAvatar=currentUser?.avatar||AVATARS[idx%AVATARS.length];
+  const myColor=currentUser?.color||COLORS[idx%COLORS.length];
+  const me={name,avatar:myAvatar,color:myColor,score:0};
   await sb.from('players').insert({room_code:code,...me});
   G.players.push({...me,isHost:false});G.scores[name]=0;
   subscribeRoom();
@@ -1149,7 +1187,6 @@ function shareRoom(){if(navigator.share)navigator.share({title:'Quid.gg',text:`R
 // LAUNCH
 async function launchGame(){
   // Stop host polling if demo mode
-  if(G.demoHostPoll){clearInterval(G.demoHostPoll);G.demoHostPoll=null;}
   go('loading');sndStart();
   G.questions=shuffle(await fetchQs(G.settings.categories.join(', '),G.settings.qCount,G.settings.diff,G.settings.mode));
   G.qIdx=0;G.players.forEach(p=>G.scores[p.name]=0);G.dotAns={};G.pu={f50:1,x2:1,d2:1};G.x2Active=false;
@@ -1344,6 +1381,16 @@ function showQuestion(){
   // power-ups state
   const puEnabled=G.settings.powerups!==false;['5050','x2','d2'].forEach(k=>{const el=document.getElementById('pu-'+k),cnt=document.getElementById('cnt-'+k);const key=k==='5050'?'f50':k;cnt.textContent=G.pu[key];el.disabled=!puEnabled||G.pu[key]<=0||(k==='5050'&&(mode==='FREE'||mode==='MVP'));if(el)el.style.opacity=!puEnabled?'0.2':'';});
   renderGameLB();startTimer();go('game');
+  // Vérifier toutes les 2s si tout le monde a répondu
+  if(G.allAnsweredPoll)clearInterval(G.allAnsweredPoll);
+  if(G.isHost){
+    G.allAnsweredPoll=setInterval(async()=>{
+      if(!G.code)return;
+      const allDone=await checkAllAnswered();
+      if(allDone)clearInterval(G.allAnsweredPoll);
+    },2000);
+  }
+
   // Poll messages en jeu
   if(G.chatPoll)clearInterval(G.chatPoll);
   G.chatPoll=setInterval(async()=>{
@@ -1396,7 +1443,6 @@ async function pickAns(idx){
   document.querySelectorAll('.ans-btn').forEach((b,i)=>{b.disabled=true;if(i===q.correct)b.classList.add('right');else if(i===idx&&!ok)b.classList.add('wrong');});
   if(ok){sndOk();spawnPts('+'+pts);}else sndFail();
   if(sb){try{await sb.from('answers').insert({room_code:G.code,player_name:G.name,question_index:G.qIdx,answer_index:idx,is_correct:ok,points:pts});}catch{} try{await sb.from('players').update({score:G.scores[G.name]}).eq('room_code',G.code).eq('name',G.name);}catch{}}
-  else simOthers();
   showResultBox(ok,pts,bonus,q.explanation||'',q.options?.[q.correct]||'');
   if(G.isHost){
     startNextCd();
@@ -1456,7 +1502,6 @@ async function submitText(){
     if(sb2){sb2.textContent='Bonne réponse : '+acceptedDisplay;sb2.style.background='rgba(255,77,109,.15)';sb2.style.color='#FF4D6D';sb2.disabled=true;}
   }
   if(sb){try{await sb.from('answers').insert({room_code:G.code,player_name:G.name,question_index:G.qIdx,attempt:val,is_correct:ok,points:pts});}catch{} try{await sb.from('players').update({score:G.scores[G.name]}).eq('room_code',G.code).eq('name',G.name);}catch{}}
-  else simOthers();
   showResultBox(ok,pts,bonus,q.explanation||'',q.answer||'');
   showResultBox(ok,pts,bonus,q.explanation||'',q.answer||'');
   if(G.isHost)startNextCd();;
@@ -1512,7 +1557,7 @@ function timeUp(){
   const q=G.questions[G.qIdx];
   document.querySelectorAll('.ans-btn').forEach((b,i)=>{b.disabled=true;if(i===q.correct)b.classList.add('right');});
   const inp=document.getElementById('ans-inp');if(inp)inp.disabled=true;
-  G.dotAns[G.qIdx]='wrong';sndFail();if(!sb)simOthers();
+  G.dotAns[G.qIdx]='wrong';sndFail();
   document.getElementById('gm-result').innerHTML=`<div class="rbox time"><span class="ri">⏱</span><div class="rt time">Temps écoulé !</div><div class="rsub">Bonne réponse : ${q.answer||q.options?.[q.correct]||''}</div>${q.explanation?`<div class="qexpl" style="margin-top:10px"><strong>💡 Le saviez-vous ?</strong> ${q.explanation}</div>`:''}</div>`;
   if(G.isHost){
     setTimeout(()=>advanceQuestion(),3000);
@@ -1543,25 +1588,26 @@ function startNextCd(){
 }
 
 async function checkAllAnswered(){
-  if(!G.isHost)return;
-  // Récupérer toutes les bonnes réponses pour cette question
+  if(!G.isHost)return false;
   const{data}=await sb.from('answers')
     .select('player_name,is_correct')
     .eq('room_code',G.code)
     .eq('question_index',G.qIdx);
-  if(!data)return;
-  // Un joueur a "répondu" s'il a au moins une bonne réponse
+  if(!data)return false;
   const answeredNames=new Set(data.filter(a=>a.is_correct).map(a=>a.player_name));
   const allAnswered=G.players.length>0&&G.players.every(p=>answeredNames.has(p.name));
   if(allAnswered){
+    clearInterval(G.allAnsweredPoll);
     clearInterval(G.timerInt);
-    setTimeout(()=>advanceQuestion(),2000);
+    setTimeout(()=>advanceQuestion(),1500);
+    return true;
   }
+  return false;
 }
 
 function advanceQuestion(){
   if(!G.isHost)return;
-  clearInterval(G.nextInt);
+  clearInterval(G.allAnsweredPoll);G.allAnsweredPoll=null;
   const isLast=G.qIdx+1>=G.questions.length;
   G.qIdx++;
   if(isLast){
@@ -1647,7 +1693,6 @@ function showFinalCountdown(){
   render();G.nextInt=setInterval(render,1000);
 }
 
-function simOthers(){G.players.forEach(p=>{if(p.name!==G.name&&Math.random()>.4)G.scores[p.name]=(G.scores[p.name]||0)+Math.floor(200+Math.random()*800);});}
 
 // POWER-UPS
 function use5050(){
@@ -1788,8 +1833,7 @@ async function playAgain(){
 }
 function changeRules(){if(G.isHost){go('create-room');}else toast('Seul l\'hôte peut changer les règles');}
 async function leaveRoom(){
-  if(G.demoHostPoll){clearInterval(G.demoHostPoll);}
-  if(G.demoJoinPoll){clearInterval(G.demoJoinPoll);}
+  if(G.allAnsweredPoll){clearInterval(G.allAnsweredPoll);G.allAnsweredPoll=null;}
   await sb.from('players').delete().eq('room_code',G.code).eq('name',G.name);
   if(chan)sb.removeChannel(chan);
   // Vérifier s'il reste des joueurs, sinon supprimer le salon
@@ -2178,9 +2222,10 @@ async function doSignup(){
   // Demo mode — localStorage
   const users=getUsers();
   if(users[email]){setAuthError('signup-err','❌ Cet e-mail est déjà utilisé.');setBtnLoading('signup-btn',false);return;}
-  users[email]={name,email,pwd:hashPwd(pwd),avatar:'🦊',createdAt:Date.now()};
+  users[email]={name,email,pwd:hashPwd(pwd),avatar:'🦊',color:userColor,createdAt:Date.now()};
   saveUsers(users);
-  currentUser={name,email,avatar:'🦊'};
+  const userColor=COLORS[Math.floor(Math.random()*COLORS.length)];
+  currentUser={name,email,avatar:'🦊',color:userColor};
   saveSession(currentUser);
   setBtnLoading('signup-btn',false);
   updateNav();
@@ -2227,7 +2272,7 @@ async function doLogin(){
     setAuthError('login-err','❌ E-mail ou mot de passe incorrect.');
     setBtnLoading('login-btn',false);return;
   }
-  currentUser={name:user.name,email,avatar:user.avatar||'🦊'};
+  currentUser={name:user.name,email,avatar:user.avatar||'🦊',color:user.color||COLORS[0]};
   saveSession(currentUser);
   setBtnLoading('login-btn',false);
   updateNav();
@@ -2308,7 +2353,8 @@ function swTab(name,btn){
 async function loadHistory(){
   if(!currentUser?.supabaseId||!sb)return;
   const el=document.getElementById('tab-historique');if(!el)return;
-  el.innerHTML='<div style="text-align:center;padding:20px;color:var(--muted)">Chargement…</div>';
+  el.innerHTML='<div style="text-align:center;padding:20px;color:var(--muted)">⏳ Chargement de l\'historique…</div>';
+  if(!currentUser?.supabaseId||!sb){el.innerHTML='<div style="text-align:center;padding:20px;color:var(--muted)">Connecte-toi pour voir ton historique</div>';return;}
   const{data}=await sb.from('game_history').select('*').eq('player_id',currentUser.supabaseId).order('played_at',{ascending:false}).limit(20);
   if(!data||!data.length){el.innerHTML='<div style="text-align:center;padding:20px;color:var(--muted)">Aucune partie jouée pour l\'instant</div>';return;}
   const modeIcons={FREE:'✍️',QCM:'🧠',MVP:'🎯',Battle:'⚔️'};
@@ -2333,9 +2379,9 @@ async function loadHistory(){
 }
 
 async function loadFriends(){
-  if(!currentUser?.supabaseId||!sb)return;
   const el=document.getElementById('tab-amis');if(!el)return;
-  el.innerHTML='<div style="text-align:center;padding:20px;color:var(--muted)">Chargement…</div>';
+  if(!currentUser?.supabaseId||!sb){el.innerHTML='<div style="text-align:center;padding:20px;color:var(--muted)">Connecte-toi pour voir tes amis</div>';return;}
+  el.innerHTML='<div style="text-align:center;padding:20px;color:var(--muted)">⏳ Chargement…</div>';
   const{data}=await sb.from('friendships').select('*,friend:friend_id(id,name,avatar)').eq('user_id',currentUser.supabaseId).eq('status','accepted');
   const{data:pending}=await sb.from('friendships').select('*,requester:user_id(id,name,avatar)').eq('friend_id',currentUser.supabaseId).eq('status','pending');
   let html=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
@@ -2365,7 +2411,8 @@ async function loadFriends(){
 async function loadRecents(){
   if(!currentUser?.supabaseId||!sb)return;
   const el=document.getElementById('tab-recents');if(!el)return;
-  el.innerHTML='<div style="text-align:center;padding:20px;color:var(--muted)">Chargement…</div>';
+  if(!currentUser?.supabaseId||!sb){el.innerHTML='<div style="text-align:center;padding:20px;color:var(--muted)">Connecte-toi pour voir les joueurs récents</div>';return;}
+  el.innerHTML='<div style="text-align:center;padding:20px;color:var(--muted)">⏳ Chargement…</div>';
   const{data}=await sb.from('recent_players').select('*').eq('user_id',currentUser.supabaseId).order('played_at',{ascending:false}).limit(20);
   if(!data?.length){el.innerHTML='<div style="text-align:center;padding:20px;color:var(--muted)">Aucun joueur récent</div>';return;}
   const{data:friends}=await sb.from('friendships').select('friend_id').eq('user_id',currentUser.supabaseId).eq('status','accepted');
