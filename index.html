@@ -454,7 +454,7 @@ button.ans-btn:disabled{cursor:default}
         <h1 class="hero-h1">
           <span class="hw">Joue.</span>
           <span class="hp">Défie.</span>
-          <span class="hw">Deviens le<br>plus cultivé.</span>
+          <span class="hw">Recommence</span>
         </h1>
         <p class="hero-sub">Quid.gg, c'est des quiz de culture générale en temps réel, dans des salons privés avec tes amis. Rapide, fun et compétitif.</p>
         <div class="hero-btns">
@@ -2483,6 +2483,7 @@ async function loadFriends(){
   </div>`).join('');
   el.innerHTML=html;
 }
+}
 
 async function loadRecents(){
   if(!currentUser?.supabaseId||!sb)return;
@@ -2531,8 +2532,8 @@ async function acceptFriend(friendshipId){
 async function removeFriend(friendshipId){
   const{data:f}=await sb.from('friendships').select('*').eq('id',friendshipId).single();
   await sb.from('friendships').delete().eq('id',friendshipId);
-  if(f)await sb.from('friendships').delete().eq('user_id',f.friend_id).eq('friend_id',f.user_id);
-  toast('Ami retiré','ok');loadFriends();
+  if(f) await sb.from('friendships').delete().eq('user_id',f.friend_id).eq('friend_id',f.user_id);
+  toast('Ami retiré','ok');
 }
 
 // TOAST
