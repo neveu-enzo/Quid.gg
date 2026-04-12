@@ -87,7 +87,7 @@ select.form-input{cursor:pointer;background:#1E293B;color:#fff;}
 @keyframes qfloat{0%,100%{transform:translateY(0) rotate(-2deg)}50%{transform:translateY(-16px) rotate(2deg)}}
 .qring{position:absolute;width:320px;height:320px;border-radius:50%;border:2px solid rgba(44,255,5,.2);box-shadow:0 0 40px rgba(44,255,5,.1),inset 0 0 40px rgba(138,0,196,.1);animation:rspin 8s linear infinite;top:50%;left:50%;transform:translate(-50%,-50%)}
 @keyframes rspin{to{transform:translate(-50%,-50%) rotate(360deg)}}
-.qbrand{font-family:'Poppins',sans-serif;font-weight:800;font-size:36px;letter-spacing:-1px;margin-top:-8px;position:relative;z-index:2}
+.qbrand{font-family:'Poppins',sans-serif;font-weight:800;font-size:36px;font-style: italic;letter-spacing:-1px;margin-top:-8px;position:relative;z-index:2}
 .qbrand .qw{color:#fff}.qbrand .qg{color:var(--acc)}
 .qsub{font-size:11px;letter-spacing:4px;text-transform:uppercase;color:var(--acc);font-weight:600;margin-top:6px;position:relative;z-index:2}
 .fi{position:absolute;font-size:28px;z-index:3;animation:fbob 3s ease-in-out infinite;filter:drop-shadow(0 0 8px rgba(138,0,196,.6))}
@@ -454,7 +454,7 @@ button.ans-btn:disabled{cursor:default}
         <h1 class="hero-h1">
           <span class="hw">Joue.</span>
           <span class="hp">Défie.</span>
-          <span class="hw">Recommence</span>
+          <span class="hw">Have Fun.</span>
         </h1>
         <p class="hero-sub">Quid.gg, c'est des quiz de culture générale en temps réel, dans des salons privés avec tes amis. Rapide, fun et compétitif.</p>
         <div class="hero-btns">
@@ -1661,14 +1661,12 @@ function startNextCd(){
 
 async function checkAllAnswered(){
   if(!G.isHost)return false;
-  // Compter localement qui a répondu (via G.dotAns)
-  const localDone=G.players.filter(p=>G.dotAns[G.qIdx]!==undefined||p.name===G.name).length;
-  // Vérifier aussi dans Supabase
-  const{data}=await sb.from('answers')
-    .select('player_name,is_correct')
-    .eq('room_code',G.code)
-    .eq('question_index',G.qIdx);
-  const answeredNames=new Set((data||[]).filter(a=>a.is_correct).map(a=>a.player_name));
+  const{data}=await sb.from('players')
+    .select('name,last_answer_at')
+    .eq('room_code',G.code);
+  if(!data)return false;
+  // Un joueur a répondu si last_answer_at a été mis à jour depuis le début de cette question
+  const answeredNames=new Set(data.filter(a=>a.last_answer_at).map(a=>a.name));
   // Ajouter l'hôte s'il a répondu localement
   if(G.answered)answeredNames.add(G.name);
   console.log('checkAllAnswered — joueurs:',G.players.map(p=>p.name),'ont répondu:',[...answeredNames]);
@@ -1691,6 +1689,8 @@ function advanceQuestion(){
   if(isLast){
     sb.from('rooms').update({status:'finished',current_q:G.qIdx}).eq('code',G.code);
     showFinalCountdown();
+    // Reset last_answer_at pour tous les joueurs
+    sb.from('players').update({last_answer_at:null}).eq('room_code',G.code);
   }else{
     sb.from('rooms').update({status:'next_question',current_q:G.qIdx}).eq('code',G.code);
     showQuestion();
