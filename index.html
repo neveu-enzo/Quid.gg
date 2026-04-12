@@ -1505,12 +1505,12 @@ function startTimer(){
     bar.style.width=(Math.max(0,G.timeLeft)/G.settings.qTime*100)+'%';
     if(G.timeLeft<=5){bar.classList.add('urg');cnt.classList.add('urg');sndTick();}
     if(G.timeLeft<=0){
-      clearInterval(G.timerInt);
-      // Tous les joueurs arrivent ici ensemble à la fin du chrono
-      if(!G.answered) timeUp();         // n'a pas répondu → affiche temps écoulé
-      else showWaitingForNext();         // a déjà répondu → reste sur "attente"
-      if(G.isHost) scheduleAdvance(3000); // l'hôte déclenche le passage après 3s
-    }
+    clearInterval(G.timerInt);
+    console.log('Timer 0 — answered:', G.answered, 'isHost:', G.isHost, '_advTimer:', _advTimer);
+    if(!G.answered) timeUp();
+    else showWaitingForNext();
+    if(G.isHost) scheduleAdvance(3000);
+  }
   },1000);
 }
 
@@ -1531,8 +1531,9 @@ function showWaitingForNext(){
 // L'hôte programme le passage à la question suivante
 let _advTimer=null;
 function scheduleAdvance(delay){
-  if(_advTimer)return; // déjà planifié
-  _advTimer=setTimeout(()=>{_advTimer=null;advanceQuestion();},delay);
+  console.log('scheduleAdvance called, _advTimer=', _advTimer);
+  if(_advTimer)return;
+  _advTimer=setTimeout(()=>{_advTimer=null;console.log('advanceQuestion firing');advanceQuestion();},delay);
 }
 
 // PICK ANSWER (QCM / Battle) — le chrono continue de tourner
@@ -1554,6 +1555,7 @@ async function pickAns(idx){
   }
   showResultBox(ok,pts,bonus,q.explanation||'',q.options?.[q.correct]||'');
   if(G.isHost && ok){
+    console.log('Host correct, correctCount=', G.correctCount, 'players=', G.players.length);
     G.correctCount++;
     if(G.correctCount>=G.players.length){
       clearInterval(G.timerInt);
@@ -1621,6 +1623,7 @@ async function submitText(){
   }
   showResultBox(ok,pts,bonus,q.explanation||'',q.answer||'');
   if(G.isHost && ok){
+    console.log('Host correct, correctCount=', G.correctCount, 'players=', G.players.length);
     G.correctCount++;
     if(G.correctCount>=G.players.length){
       clearInterval(G.timerInt);
