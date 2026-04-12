@@ -1405,6 +1405,7 @@ function showQuestion(){
   const q=G.questions[G.qIdx];if(!q){showFinal();return;}
   G.answeredCount = 0;
   G.correctCount = 0;
+  G.answered = false;
   G.nextStarted = false;
   G.questionStartTime = new Date().toISOString();
   if(_advTimer){clearTimeout(_advTimer);_advTimer=null;} // reset advance timer
