@@ -926,7 +926,7 @@ try{
 }catch(e){
   console.error('❌ Supabase erreur',e);
 }
-const G={name:'',isHost:false,code:'',players:[],settings:{},questions:[],qIdx:0,scores:{},answered:false,selAns:null,timerInt:null,timeLeft:20,answeredCount: 0,nextStarted: false,nextInt:null,dotAns:{},pu:{f50:1,x2:1,d2:1},x2Active:false,selMode:'FREE',selDiff:'normal',freeAttempts:{},lastWrongAttempt:{},lobbyPoll:null,chatPoll:null,allAnsweredPoll:null,questionStartTime:null};
+const G={name:'',isHost:false,code:'',players:[],settings:{},questions:[],qIdx:0,scores:{},answered:false,correctCount:0,selAns:null,timerInt:null,timeLeft:20,answeredCount: 0,nextStarted: false,nextInt:null,dotAns:{},pu:{f50:1,x2:1,d2:1},x2Active:false,selMode:'FREE',selDiff:'normal',freeAttempts:{},lastWrongAttempt:{},lobbyPoll:null,chatPoll:null,allAnsweredPoll:null,questionStartTime:null};
 
 window.addEventListener('DOMContentLoaded',()=>{
   loadSession();
@@ -1115,6 +1115,10 @@ function subscribeRoom(){
           showWaitingForNext();
           scheduleAdvance(3000);
         }
+        if(G.isHost && a.is_correct && a.question_index === G.qIdx){
+  G.correctCount++;
+  if(G.correctCount >= G.players.length){ clearInterval(G.timerInt); showWaitingForNext(); scheduleAdvance(3000); }
+}
       }
       if(G.settings.mode==='FREE'||G.settings.mode==='MVP'){
         // Tentatives texte : afficher si showTries activé
@@ -1404,6 +1408,7 @@ function fallback(cats,diff){
 function showQuestion(){
   const q=G.questions[G.qIdx];if(!q){showFinal();return;}
   G.answeredCount = 0;
+  G.correctCount = 0;
   G.nextStarted = false;
   G.questionStartTime = new Date().toISOString();
   if(_advTimer){clearTimeout(_advTimer);_advTimer=null;} // reset advance timer
@@ -1553,14 +1558,9 @@ async function pickAns(idx){
   }
   showResultBox(ok,pts,bonus,q.explanation||'',q.options?.[q.correct]||'');
   // Afficher "en attente" pendant que le chrono finit
-  if(G.isHost && ok){
-  G.answeredCount++;
-  if(G.answeredCount >= G.players.length){
-    clearInterval(G.timerInt);
-    showWaitingForNext();
-    scheduleAdvance(3000);
-    return;
-  }
+  if(ok && G.isHost){
+  G.correctCount++;
+  if(G.correctCount >= G.players.length){ clearInterval(G.timerInt); showWaitingForNext(); scheduleAdvance(3000); }
 }
 const nxt=document.getElementById('gm-next');
 if(nxt){nxt.style.display='block';nxt.innerHTML=`<div class="next-cd"><span class="nc-lbl">En attente des autres joueurs…</span></div>`;}
@@ -1621,14 +1621,9 @@ async function submitText(){
   }
   showResultBox(ok,pts,bonus,q.explanation||'',q.answer||'');
   // Afficher "en attente" pendant que le chrono finit
-  if(G.isHost && ok){
-  G.answeredCount++;
-  if(G.answeredCount >= G.players.length){
-    clearInterval(G.timerInt);
-    showWaitingForNext();
-    scheduleAdvance(3000);
-    return;
-  }
+  if(ok && G.isHost){
+  G.correctCount++;
+  if(G.correctCount >= G.players.length){ clearInterval(G.timerInt); showWaitingForNext(); scheduleAdvance(3000); }
 }const nxtEl=document.getElementById('gm-next');
   if(nxtEl){nxtEl.style.display='block';nxtEl.innerHTML=`<div class="next-cd"><span class="nc-lbl">En attente des autres joueurs…</span></div>`;}
 }
