@@ -507,6 +507,11 @@ button.ans-btn:disabled{cursor:default}
       </div>
       <div class="form-group">
         <label class="form-label">Catégories</label>
+        <div style="display:flex;gap:8px;margin-bottom:8px">
+          <div class="cc" style="background:rgba(255,255,255,.08);color:var(--faint)" onclick="selectAllCats()">✅ Tout sélectionner</div>
+          <div class="cc" style="background:rgba(255,255,255,.08);color:var(--faint)" onclick="deselectAllCats()">❌ Tout désélectionner</div>
+          <div class="cc" style="background:rgba(138,0,196,.2);color:#A020E0" onclick="randomCat()">🎲 Aléatoire</div>
+        </div>
         <div class="cat-chips" id="cat-chips">
           <div class="cc on" data-cat="Général" onclick="togCat(this)">🎯 Général</div>
           <div class="cc" data-cat="Histoire" onclick="togCat(this)">📜 Histoire</div>
@@ -520,6 +525,14 @@ button.ans-btn:disabled{cursor:default}
           <div class="cc" data-cat="Musique" onclick="togCat(this)">🎵 Musique</div>
           <div class="cc" data-cat="Monuments" onclick="togCat(this)">🏛 Monuments</div>
           <div class="cc" data-cat="Célébrités" onclick="togCat(this)">⭐ Célébrités</div>
+          <div class="cc" data-cat="Art" onclick="togCat(this)">🎨 Art</div>
+          <div class="cc" data-cat="Jeux vidéo" onclick="togCat(this)">🎮 Jeux vidéo</div>
+          <div class="cc" data-cat="Anime/Manga" onclick="togCat(this)">🇯🇵 Anime/Manga</div>
+          <div class="cc" data-cat="Gastronomie" onclick="togCat(this)">🍽 Gastronomie</div>
+          <div class="cc" data-cat="Maths" onclick="togCat(this)">🔢 Maths</div>
+          <div class="cc" data-cat="Mythologie" onclick="togCat(this)">⚡ Mythologie</div>
+          <div class="cc" data-cat="Orthographe" onclick="togCat(this)">✍️ Orthographe</div>
+          <div class="cc" data-cat="Logique" onclick="togCat(this)">🧩 Logique</div>
         </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
@@ -991,6 +1004,14 @@ async function openProfile(){
 
 // FORM HELPERS
 function togCat(el){el.classList.toggle('on');}
+function selectAllCats(){document.querySelectorAll('#cat-chips .cc').forEach(e=>e.classList.add('on'));}
+function deselectAllCats(){document.querySelectorAll('#cat-chips .cc').forEach(e=>e.classList.remove('on'));}
+function randomCat(){
+  const all=document.querySelectorAll('#cat-chips .cc');
+  all.forEach(e=>e.classList.remove('on'));
+  const arr=[...all];
+  arr[Math.floor(Math.random()*arr.length)].classList.add('on');
+}
 function toggleOpt(id,wrap){
   const inp=document.getElementById(id);if(!inp)return;
   inp.checked=!inp.checked;
@@ -1338,7 +1359,7 @@ Mode de réponse : ${isText?'Réponse écrite libre (1 mot ou courte phrase). Fo
 Types de questions à varier : texte classique, image (drapeaux=emoji du drapeau, logos de marques=emoji, monuments=emoji, personnages célèbres=emoji, extraits cinéma=emoji thématique).
 Mélange aléatoire l'ordre des questions. Ne commence pas toutes les questions de la même façon.
 RÉPONDS UNIQUEMENT avec ce JSON valide, sans markdown, sans texte avant ou après :
-{"questions":[{"category":"NomCategorie","type":"text|image","imageHint":"emoji représentatif si type image, sinon null","question":"La question ?","${isText?'answer":"réponse exacte"':'"options":["Option A","Option B","Option C","Option D"],"correct":0'},"explanation":"Explication courte et intéressante en 1 phrase."}]}`;
+{"questions":[{"category":"NomCategorie","type":"text|image","question":"La question ?","${isText?'answer":"réponse exacte"':'"options":["Option A","Option B","Option C","Option D"],"correct":0'},"explanation":"Explication courte et intéressante en 1 phrase."}]}`;
   try{
     const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:2000,messages:[{role:'user',content:prompt}]})});
     const d=await r.json();
@@ -1429,12 +1450,7 @@ function showQuestion(){
   const tt=document.getElementById('gm-type');tt.style.display=q.type==='image'?'inline-flex':'none';
   // body
   let bodyHtml='';
-  if(q.type==='image'){
-    if(q.image_url){
-      bodyHtml=`<div style="text-align:center;padding:12px;background:var(--hover);border-radius:16px;overflow:hidden">
-        <img src="${q.image_url}" alt="illustration" style="max-width:100%;max-height:280px;border-radius:10px;object-fit:contain" onerror="this.parentElement.innerHTML='${q.imageHint||'🖼'}'"/>
-      </div>`;
-    }
+  if(q.type==='image'&&q.image_url){
   }
   bodyHtml+=`<div class="qtext">${q.question}</div>`;
   document.getElementById('gm-qbody').innerHTML=bodyHtml;
@@ -2029,7 +2045,7 @@ function renderBank(){
       <div class="bq-header">
         ${qCats.map(c=>`<span class="bq-cat">${c}</span>`).join('')}
         ${qDiffs.map(d=>`<span class="bq-diff">${diffL[d]||d}</span>`).join('')}
-        ${q.type==='image'?(q.image_url?`<img src="${q.image_url}" style="height:32px;width:48px;object-fit:cover;border-radius:6px;vertical-align:middle" onerror="this.style.display='none'"/>`:`<span style="font-size:20px">${q.imageHint||q.image_hint||'🖼'}</span>`):''}
+        ${q.type==='image'?(q.image_url?`<img src="${q.image_url}" style="height:32px;width:48px;object-fit:cover;border-radius:6px;vertical-align:middle" onerror="this.style.display='none'"/>`:`):''}
         ${q.is_custom?'<span style="font-size:10px;color:var(--faint);margin-left:auto">importée</span>':''}
       </div>
       <div class="bq-question">${q.question}</div>
