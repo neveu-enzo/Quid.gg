@@ -807,6 +807,7 @@ button.ans-btn:disabled{cursor:default}
     </div>
     <div class="gside">
       <div class="slb"><div class="stitle">🏆 Classement</div><div id="gm-lb"></div></div>
+      <div id="wrong-attempts"></div>
       <div class="schat">
         <div class="stitle" style="margin-bottom:8px">💬 Chat</div>
         <div class="cmsgs" id="chat-msgs"></div>
@@ -925,7 +926,7 @@ try{
 }catch(e){
   console.error('❌ Supabase erreur',e);
 }
-const G={name:'',isHost:false,code:'',players:[],settings:{},questions:[],qIdx:0,scores:{},answered:false,selAns:null,timerInt:null,timeLeft:20,nextInt:null,dotAns:{},pu:{f50:1,x2:1,d2:1},x2Active:false,selMode:'FREE',selDiff:'normal',freeAttempts:{},lastWrongAttempt:{},lobbyPoll:null,chatPoll:null,allAnsweredPoll:null};
+const G={name:'',isHost:false,code:'',players:[],settings:{},questions:[],qIdx:0,scores:{},answered:false,selAns:null,timerInt:null,timeLeft:20,answeredCount: 0,nextStarted: false,nextInt:null,dotAns:{},pu:{f50:1,x2:1,d2:1},x2Active:false,selMode:'FREE',selDiff:'normal',freeAttempts:{},lastWrongAttempt:{},lobbyPoll:null,chatPoll:null,allAnsweredPoll:null};
 
 window.addEventListener('DOMContentLoaded',()=>{
   loadSession();
@@ -1108,6 +1109,20 @@ function subscribeRoom(){
         if(G.settings.mode==='FREE'&&a.attempt)onOtherAttempt(a.player_name,a.attempt,a.is_correct);
       }
     })
+    .on('postgres_changes',{
+  event:'INSERT',
+  schema:'public',
+  table:'answers',
+  filter:`room_code=eq.${G.code}`
+},payload=>{
+  const a = payload.new;
+
+  if (a.question_index !== G.qIdx) return;
+  if (a.is_correct) return;
+  if (!G.settings.showTries) return;
+
+  displayWrongAttempt(a);
+})
     .on('postgres_changes',{event:'UPDATE',schema:'public',table:'players',filter:`room_code=eq.${G.code}`},p=>{
       const pl=p.new;
       if(pl.name!==G.name){
@@ -1388,7 +1403,11 @@ function fallback(cats,diff){
 // SHOW QUESTION
 function showQuestion(){
   const q=G.questions[G.qIdx];if(!q){showFinal();return;}
-  G.answered=false;G.selAns=null;G.x2Active=false;
+  G.answeredCount = 0;
+  G.nextStarted = false;
+  const box = document.getElementById('wrong-attempts');
+  if (box) box.innerHTML = '';
+  G.selAns=null;G.x2Active=false;
   G.freeAttempts={};
   G.lastWrongAttempt={};
   document.getElementById('tb-code').textContent=G.code;
@@ -1437,6 +1456,42 @@ function showQuestion(){
     },2000);
   }
 
+  function triggerNextQuestion(){
+  if (G.nextStarted) return;
+  G.nextStarted = true;
+
+  clearInterval(G.timerInt);
+
+  setTimeout(async () => {
+
+    G.qIdx++;
+
+    const isLast = G.qIdx >= G.questions.length;
+
+    if (isLast) {
+      if (G.isHost && sb) {
+        await sb.from('rooms')
+          .update({status:'finished'})
+          .eq('code',G.code);
+      }
+      showFinal();
+      return;
+    }
+
+    if (G.isHost && sb) {
+      await sb.from('rooms')
+        .update({
+          current_q: G.qIdx,
+          status: 'next_question'
+        })
+        .eq('code',G.code);
+    }
+
+    showQuestion();
+
+  }, 1500);
+}
+
   // Poll messages en jeu
   if(G.chatPoll)clearInterval(G.chatPoll);
   G.chatPoll=setInterval(async()=>{
@@ -1457,6 +1512,19 @@ function showQuestion(){
       }
     }
   },2000);
+}
+
+function displayWrongAttempt(a){
+  const box = document.getElementById('wrong-attempts');
+  if(!box) return;
+
+  const el = document.createElement('div');
+  el.className = 'wrong-attempt';
+  el.textContent = `${a.player_name} : ${a.attempt || ''}`;
+
+  box.appendChild(el);
+
+  setTimeout(()=>el.remove(),4000);
 }
 
 // TIMER
@@ -1493,6 +1561,10 @@ function startTimer(){
 
 // PICK ANSWER (QCM / Battle)
 async function pickAns(idx){
+  G.answeredCount++;
+  if (G.isHost && G.answeredCount >= G.players.length) {
+  triggerNextQuestion();
+}
   if(G.answered)return;
   G.answered=true;G.selAns=idx;clearInterval(G.timerInt);
   const q=G.questions[G.qIdx],ok=idx===q.correct;
@@ -1509,7 +1581,7 @@ async function pickAns(idx){
   }
   showResultBox(ok,pts,bonus,q.explanation||'',q.options?.[q.correct]||'');
   if(G.isHost){
-    startNextCd();
+    triggerNextQuestion();
   }else{
     // Les non-hôtes affichent juste le résultat et attendent le signal
     showResultBox(ok,pts,bonus,q.explanation||'',q.options?.[q.correct]||'');
@@ -1518,6 +1590,10 @@ async function pickAns(idx){
 
 // TEXT ANSWER (FREE / MVP)
 async function submitText(){
+  G.answeredCount++;
+  if (G.isHost && G.answeredCount >= G.players.length) {
+  triggerNextQuestion();
+}
   if(G.answered)return;
   const inp=document.getElementById('ans-inp');if(!inp)return;
   const val=inp.value.trim();
@@ -1571,7 +1647,7 @@ async function submitText(){
   }
   showResultBox(ok,pts,bonus,q.explanation||'',q.answer||'');
   showResultBox(ok,pts,bonus,q.explanation||'',q.answer||'');
-  if(G.isHost)startNextCd();;
+  if(G.isHost)triggerNextQuestion();;
 }
 
 // Render FREE mode attempts list
