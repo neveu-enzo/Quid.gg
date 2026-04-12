@@ -1506,6 +1506,7 @@ function startTimer(){
     if(G.timeLeft<=5){bar.classList.add('urg');cnt.classList.add('urg');sndTick();}
     if(G.timeLeft<=0){
     clearInterval(G.timerInt);
+    console.log('Timer reached 0, isHost:', G.isHost, 'answered:', G.answered);
     console.log('Timer 0 — answered:', G.answered, 'isHost:', G.isHost, '_advTimer:', _advTimer);
     if(!G.answered) timeUp();
     else showWaitingForNext();
@@ -1533,7 +1534,7 @@ let _advTimer=null;
 function scheduleAdvance(delay){
   console.log('scheduleAdvance called, _advTimer=', _advTimer);
   if(_advTimer)return;
-  _advTimer=setTimeout(()=>{_advTimer=null;console.log('advanceQuestion firing');advanceQuestion();},delay);
+  _advTimer=setTimeout(()=>{_advTimer=null;console.log('firing advanceQuestion');advanceQuestion();},delay);
 }
 
 // PICK ANSWER (QCM / Battle) — le chrono continue de tourner
@@ -1702,14 +1703,15 @@ function showResultBox(ok,pts,bonus,expl,correctAns){
 
 function advanceQuestion(){
   if(!G.isHost)return;
+  console.log('advanceQuestion called');
   clearInterval(G.timerInt);
   G.qIdx++;
   const isLast=G.qIdx>=G.questions.length;
   if(isLast){
-    sb.from('rooms').update({status:'finished',current_q:G.qIdx}).eq('code',G.code);
+    sb.from('rooms').update({status:'finished',current_q:G.qIdx}).eq('code',G.code).then(({error})=>console.log('finished update:',error||'OK'));
     showFinalCountdown();
   }else{
-    sb.from('rooms').update({status:'q_'+G.qIdx,current_q:G.qIdx}).eq('code',G.code);
+    sb.from('rooms').update({status:'q_'+G.qIdx,current_q:G.qIdx}).eq('code',G.code).then(({error})=>console.log('next_q update:',error||'OK'));
     showQuestion();
   }
 }
