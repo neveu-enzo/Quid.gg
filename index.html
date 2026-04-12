@@ -2045,7 +2045,7 @@ function renderBank(){
       <div class="bq-header">
         ${qCats.map(c=>`<span class="bq-cat">${c}</span>`).join('')}
         ${qDiffs.map(d=>`<span class="bq-diff">${diffL[d]||d}</span>`).join('')}
-        ${q.type==='image'?(q.image_url?`<img src="${q.image_url}" style="height:32px;width:48px;object-fit:cover;border-radius:6px;vertical-align:middle" onerror="this.style.display='none'"/>`:`):''}
+        ${q.type==='image'&&q.image_url?`<img src="${q.image_url}" style="height:32px;width:48px;object-fit:cover;border-radius:6px;vertical-align:middle" onerror="this.style.display='none'"/>`:``}
         ${q.is_custom?'<span style="font-size:10px;color:var(--faint);margin-left:auto">importée</span>':''}
       </div>
       <div class="bq-question">${q.question}</div>
