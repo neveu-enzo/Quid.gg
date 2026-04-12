@@ -1098,11 +1098,11 @@ function subscribeRoom(){
     })
     .on('postgres_changes',{event:'UPDATE',schema:'public',table:'rooms',filter:`code=eq.${G.code}`},p=>{
       const r=p.new;
-      if(r.status==='playing'&&r.current_q===0){
-        if(!G.isHost){G.questions=r.questions;G.settings=r.settings;G.qIdx=r.current_q;showQuestion();}
+      if(r.status==='playing'){
+      if(!G.isHost){G.questions=r.questions;G.settings=r.settings;G.qIdx=r.current_q;showQuestion();}
       }
       if(r.status&&r.status.startsWith('q_')){
-        if(!G.isHost){G.qIdx=r.current_q;clearInterval(G.timerInt);showQuestion();}
+      if(!G.isHost){G.qIdx=r.current_q;clearInterval(G.timerInt);showQuestion();}
       }
       if(r.status==='finished'){
         if(!G.isHost){fetchScoresFinal();}
@@ -1407,7 +1407,7 @@ function fallback(cats,diff){
 // SHOW QUESTION
 function showQuestion(){
   const q=G.questions[G.qIdx];if(!q){showFinal();return;}
-  G.answeredCount = 0;
+  G.answeredCount = 0;G.answered = false;
   G.correctCount = 0;
   G.nextStarted = false;
   G.questionStartTime = new Date().toISOString();
