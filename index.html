@@ -926,7 +926,7 @@ try{
 }catch(e){
   console.error('❌ Supabase erreur',e);
 }
-const G={name:'',isHost:false,code:'',players:[],settings:{},questions:[],qIdx:0,scores:{},answered:false,selAns:null,timerInt:null,timeLeft:20,answeredCount: 0,nextStarted: false,nextInt:null,dotAns:{},pu:{f50:1,x2:1,d2:1},x2Active:false,selMode:'FREE',selDiff:'normal',freeAttempts:{},lastWrongAttempt:{},lobbyPoll:null,chatPoll:null,allAnsweredPoll:null};
+const G={name:'',isHost:false,code:'',players:[],settings:{},questions:[],qIdx:0,scores:{},answered:false,selAns:null,timerInt:null,timeLeft:20,answeredCount: 0,nextStarted: false,nextInt:null,dotAns:{},pu:{f50:1,x2:1,d2:1},x2Active:false,selMode:'FREE',selDiff:'normal',freeAttempts:{},lastWrongAttempt:{},lobbyPoll:null,chatPoll:null,allAnsweredPoll:null,questionStartTime:null};
 
 window.addEventListener('DOMContentLoaded',()=>{
   loadSession();
@@ -1405,6 +1405,7 @@ function showQuestion(){
   const q=G.questions[G.qIdx];if(!q){showFinal();return;}
   G.answeredCount = 0;
   G.nextStarted = false;
+  G.questionStartTime = new Date().toISOString();
   const box = document.getElementById('wrong-attempts');
   if (box) box.innerHTML = '';
   G.selAns=null;G.x2Active=false;
@@ -1561,10 +1562,6 @@ function startTimer(){
 
 // PICK ANSWER (QCM / Battle)
 async function pickAns(idx){
-  G.answeredCount++;
-  if (G.isHost && G.answeredCount >= G.players.length) {
-  triggerNextQuestion();
-}
   if(G.answered)return;
   G.answered=true;G.selAns=idx;clearInterval(G.timerInt);
   const q=G.questions[G.qIdx],ok=idx===q.correct;
@@ -1580,20 +1577,14 @@ async function pickAns(idx){
     try{await sb.from('players').update({last_answer_at:new Date().toISOString(),score:G.scores[G.name]}).eq('room_code',G.code).eq('name',G.name);}catch{}
   }
   showResultBox(ok,pts,bonus,q.explanation||'',q.options?.[q.correct]||'');
+  G.answeredCount++;
   if(G.isHost){
-    triggerNextQuestion();
-  }else{
-    // Les non-hôtes affichent juste le résultat et attendent le signal
-    showResultBox(ok,pts,bonus,q.explanation||'',q.options?.[q.correct]||'');
-  };
+    if(G.answeredCount>=G.players.length) triggerNextQuestion();
+  }
 }
 
 // TEXT ANSWER (FREE / MVP)
 async function submitText(){
-  G.answeredCount++;
-  if (G.isHost && G.answeredCount >= G.players.length) {
-  triggerNextQuestion();
-}
   if(G.answered)return;
   const inp=document.getElementById('ans-inp');if(!inp)return;
   const val=inp.value.trim();
@@ -1646,8 +1637,10 @@ async function submitText(){
     try{await sb.from('players').update({last_answer_at:new Date().toISOString(),score:G.scores[G.name]}).eq('room_code',G.code).eq('name',G.name);}catch{}
   }
   showResultBox(ok,pts,bonus,q.explanation||'',q.answer||'');
-  showResultBox(ok,pts,bonus,q.explanation||'',q.answer||'');
-  if(G.isHost)triggerNextQuestion();;
+  G.answeredCount++;
+  if(G.isHost){
+    if(G.answeredCount>=G.players.length) triggerNextQuestion();
+  }
 }
 
 // Render FREE mode attempts list
@@ -1741,8 +1734,9 @@ async function checkAllAnswered(){
     .select('name,last_answer_at')
     .eq('room_code',G.code);
   if(!data)return false;
-  // Un joueur a répondu si last_answer_at a été mis à jour depuis le début de cette question
-  const answeredNames=new Set(data.filter(a=>a.last_answer_at).map(a=>a.name));
+  // Un joueur a répondu si last_answer_at a été mis à jour DEPUIS le début de cette question
+  const qStart=G.questionStartTime||new Date(0).toISOString();
+  const answeredNames=new Set(data.filter(a=>a.last_answer_at&&a.last_answer_at>=qStart).map(a=>a.name));
   // Ajouter l'hôte s'il a répondu localement
   if(G.answered)answeredNames.add(G.name);
   console.log('checkAllAnswered — joueurs:',G.players.map(p=>p.name),'ont répondu:',[...answeredNames]);
@@ -1765,8 +1759,7 @@ function advanceQuestion(){
   if(isLast){
     sb.from('rooms').update({status:'finished',current_q:G.qIdx}).eq('code',G.code);
     showFinalCountdown();
-    // Reset last_answer_at pour tous les joueurs
-    sb.from('players').update({last_answer_at:null}).eq('room_code',G.code);
+    // Reset last_answer_at géré par le filtre questionStartTime
   }else{
     sb.from('rooms').update({status:'next_question',current_q:G.qIdx}).eq('code',G.code);
     showQuestion();
