@@ -1593,7 +1593,7 @@ async function submitText(){
     G.freeAttempts[G.name].push(val);
     renderFreeAttempts(val,false);
     // Broadcast attempt via Supabase
-    if(sb){sb.from('answers').insert({room_code:G.code,player_name:G.name,question_index:G.qIdx,attempt:val,is_correct:false,points:0,answered_at:new Date().toISOString()}).then(({error})=>{if(error)console.warn('answers:',error.message);});}
+    if(sb){sb.from('answers').insert({room_code:G.code,player_name:G.name,question_index:G.qIdx,answer_index:null,is_correct:false,points:0,answered_at:new Date().toISOString()}).then(({error})=>{if(error)console.warn('answers:',error.message);});}
     return; // ← ne termine PAS la question
   }
 
@@ -1616,7 +1616,7 @@ async function submitText(){
     if(sb2){sb2.textContent='Bonne réponse : '+acceptedDisplay;sb2.style.background='rgba(255,77,109,.15)';sb2.style.color='#FF4D6D';sb2.disabled=true;}
   }
   if(sb){
-    sb.from('answers').insert({room_code:G.code,player_name:G.name,question_index:G.qIdx,attempt:val,is_correct:ok,points:pts,answered_at:new Date().toISOString()}).then(({error})=>{if(error)console.warn('answers:',error.message);});
+    sb.from('answers').insert({room_code:G.code,player_name:G.name,question_index:G.qIdx,answer_index:null,is_correct:ok,points:pts,answered_at:new Date().toISOString()}).then(({error})=>{if(error)console.warn('answers:',error.message);});
     sb.from('players').update({last_answer_at:new Date().toISOString(),score:G.scores[G.name]}).eq('room_code',G.code).eq('name',G.name).then(({error})=>{if(error)console.warn('players:',error.message);});
   }
   showResultBox(ok,pts,bonus,q.explanation||'',q.answer||'');
