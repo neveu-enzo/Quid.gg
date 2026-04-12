@@ -1408,6 +1408,7 @@ function showQuestion(){
       bodyHtml=`<div style="text-align:center;padding:12px;background:var(--hover);border-radius:16px;overflow:hidden">
         <img src="${q.image_url}" alt="illustration" style="max-width:100%;max-height:280px;border-radius:10px;object-fit:contain" onerror="this.parentElement.innerHTML='${q.imageHint||'🖼'}'"/>
       </div>`;
+    }
   }
   bodyHtml+=`<div class="qtext">${q.question}</div>`;
   document.getElementById('gm-qbody').innerHTML=bodyHtml;
@@ -2483,7 +2484,6 @@ async function loadFriends(){
   </div>`).join('');
   el.innerHTML=html;
 }
-}
 
 async function loadRecents(){
   if(!currentUser?.supabaseId||!sb)return;
@@ -2538,6 +2538,7 @@ async function removeFriend(friendshipId){
 
 // TOAST
 function toast(msg,type){document.querySelectorAll('.toast').forEach(t=>t.remove());const el=document.createElement('div');el.className='toast '+(type||'');el.textContent=msg;document.body.appendChild(el);setTimeout(()=>{el.style.opacity='0';},2500);setTimeout(()=>el.remove(),3000);}
+
 </script>
 </body>
 </html>
