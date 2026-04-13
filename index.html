@@ -1085,7 +1085,7 @@ async function joinRoom(){
 
 // REALTIME
 function subscribeRoom(){
-  chan=sb.channel('room:'+G.code)
+  chan=sb.channel('room:'+G.code,{config:{broadcast:{self:false}}})
 .on('postgres_changes',{event:'*',schema:'public',table:'rooms'},p=>{
   console.log('REALTIME ROOMS EVENT:', p);
 })
@@ -1168,6 +1168,9 @@ function subscribeRoom(){
     })
     .on('broadcast',{event:'blackout'},(payload)=>{
   if(!G.isHost) applyBlackout();
+})
+.on('broadcast',{event:'blackout'},()=>{
+  applyBlackout();
 })
     .subscribe();
 }
@@ -1542,13 +1545,10 @@ function showWaitingForNext(){
   const el=document.getElementById('gm-next');
   if(!el)return;
   el.style.display='block';
-  if(G.isHost){
-    let cd=3;
-    el.innerHTML=`<div class="next-cd"><span class="nc-lbl">Prochaine question dans <span id="ncd-val">${cd}</span>s…</span></div>`;
-    const iv=setInterval(()=>{cd--;const s=document.getElementById('ncd-val');if(s)s.textContent=cd;if(cd<=0)clearInterval(iv);},1000);
-  }else{
-    el.innerHTML=`<div class="next-cd"><span class="nc-lbl">En attente de l’hôte…</span></div>`;
-  }
+  let cd=3;
+  const lbl=G.isHost?'Prochaine question dans':'Prochaine question dans';
+  el.innerHTML=`<div class="next-cd"><span class="nc-lbl">${lbl} <span id="ncd-val">${cd}</span>s…</span></div>`;
+  const iv=setInterval(()=>{cd--;const s=document.getElementById('ncd-val');if(s)s.textContent=cd;if(cd<=0)clearInterval(iv);},1000);
 }
 
 // L'hôte programme le passage à la question suivante
