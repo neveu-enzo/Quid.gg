@@ -1128,9 +1128,6 @@ function subscribeRoom(){
       if(r.status==='finished'){
         if(!G.isHost){fetchScoresFinal();}
       }
-      if(r.status&&r.status.startsWith('blackout_')){
-      if(!G.isHost) applyBlackout();
-    }
     })
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'answers',filter:`room_code=eq.${G.code}`},p=>{
       const a=p.new;
@@ -1169,6 +1166,9 @@ function subscribeRoom(){
         }
       }
     })
+    .on('broadcast',{event:'blackout'},(payload)=>{
+  if(!G.isHost) applyBlackout();
+})
     .subscribe();
 }
 
@@ -1818,8 +1818,7 @@ function useBlackout(){
   if(G.pu.f50<=0||G.answered)return;G.pu.f50--;
   document.getElementById('cnt-5050').textContent=G.pu.f50;
   document.getElementById('pu-5050').disabled=true;
-  // Diffuser le blackout via Supabase
-  if(sb)sb.from('rooms').update({status:'blackout_'+Date.now()}).eq('code',G.code);
+  chan.send({type:'broadcast',event:'blackout',payload:{}});
   toast('🌑 Blackout ! Écran des adversaires flou pendant 5s !');
 }
 function applyBlackout(){
