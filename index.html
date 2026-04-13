@@ -253,7 +253,7 @@ button.ans-btn:disabled{cursor:default}
 .pub:not(:disabled):hover{transform:translateY(-2px)}
 .pu-em{font-size:22px;display:block}.pu-nm{font-size:12px;font-weight:700}
 .pu-cnt{position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#fff;color:#0B0F1A;font-size:11px;font-weight:900;display:flex;align-items:center;justify-content:center}
-.pu5050{background:rgba(138,0,196,.2);border:1px solid rgba(138,0,196,.35);color:var(--pri-l)}.pu5050:not(:disabled):hover{background:rgba(138,0,196,.35);box-shadow:0 0 16px var(--pri-g)}
+.pu5050{background:rgba(255,77,109,.15);border:1px solid rgba(255,77,109,.35);color:#FF4D6D}.pu5050:not(:disabled):hover{background:rgba(255,77,109,.3);box-shadow:0 0 16px rgba(255,77,109,.5)}
 .pux2{background:rgba(44,255,5,.1);border:1px solid rgba(44,255,5,.3);color:var(--acc)}.pux2:not(:disabled):hover{background:rgba(44,255,5,.2);box-shadow:0 0 16px var(--acc-g)}
 .pud2{background:rgba(255,190,11,.12);border:1px solid rgba(255,190,11,.3);color:var(--warn)}.pud2:not(:disabled):hover{background:rgba(255,190,11,.25)}
 .qexpl{background:rgba(138,0,196,.08);border:1px solid rgba(138,0,196,.2);border-radius:14px;padding:14px 18px;font-size:13px;color:var(--muted);line-height:1.6}
@@ -811,7 +811,7 @@ button.ans-btn:disabled{cursor:default}
       <div class="qbody" id="gm-qbody"></div>
       <div class="ans-list" id="gm-answers"></div>
       <div class="pus">
-        <button class="pub pu5050" id="pu-5050" onclick="use5050()"><span class="pu-em">⊘</span><span class="pu-nm">50/50</span><span class="pu-cnt" id="cnt-5050">1</span></button>
+        <button class="pub pu5050" id="pu-5050" onclick="useBlackout()"><span class="pu-em">🌑</span><span class="pu-nm">Blackout</span><span class="pu-cnt" id="cnt-5050">1</span></button>
         <button class="pub pux2" id="pu-x2" onclick="usePuX2()"><span class="pu-em">✕2</span><span class="pu-nm">Points x2</span><span class="pu-cnt" id="cnt-x2">1</span></button>
         <button class="pub pud2" id="pu-d2" onclick="usePuD2()"><span class="pu-em">÷2</span><span class="pu-nm">÷2 les autres</span><span class="pu-cnt" id="cnt-d2">1</span></button>
       </div>
@@ -1128,6 +1128,9 @@ function subscribeRoom(){
       if(r.status==='finished'){
         if(!G.isHost){fetchScoresFinal();}
       }
+      if(r.status&&r.status.startsWith('blackout_')){
+      if(!G.isHost) applyBlackout();
+    }
     })
     .on('postgres_changes',{event:'INSERT',schema:'public',table:'answers',filter:`room_code=eq.${G.code}`},p=>{
       const a=p.new;
@@ -1451,7 +1454,10 @@ function showQuestion(){
   // body
   let bodyHtml='';
   if(q.type==='image'&&q.image_url){
-  }
+  bodyHtml=`<div style="text-align:center;padding:12px;background:var(--hover);border-radius:16px;overflow:hidden">
+    <img src="${q.image_url}" alt="illustration" style="max-width:100%;max-height:280px;border-radius:10px;object-fit:contain" onerror="this.parentElement.style.display='none'"/>
+  </div>`;
+}
   bodyHtml+=`<div class="qtext">${q.question}</div>`;
   document.getElementById('gm-qbody').innerHTML=bodyHtml;
   // answers
@@ -1467,7 +1473,7 @@ function showQuestion(){
     aEl.innerHTML=(q.options||[]).map((o,i)=>`<button class="ans-btn" id="ans${i}" onclick="pickAns(${i})"><span class="altr">${L[i]}</span><span class="atxt">${o}</span><span class="achk">✓</span></button>`).join('');
   }
   // power-ups state
-  const puEnabled=G.settings.powerups!==false;['5050','x2','d2'].forEach(k=>{const el=document.getElementById('pu-'+k),cnt=document.getElementById('cnt-'+k);const key=k==='5050'?'f50':k;cnt.textContent=G.pu[key];el.disabled=!puEnabled||G.pu[key]<=0||(k==='5050'&&(mode==='FREE'||mode==='MVP'));if(el)el.style.opacity=!puEnabled?'0.2':'';});
+  const puEnabled=G.settings.powerups!==false;['5050','x2','d2'].forEach(k=>{const el=document.getElementById('pu-'+k),cnt=document.getElementById('cnt-'+k);const key=k==='5050'?'f50':k;cnt.textContent=G.pu[key];el.disabled=!puEnabled||G.pu[key]<=0;if(el)el.style.opacity=!puEnabled?'0.2':'';});
   renderGameLB();startTimer();go('game');
 
 
@@ -1808,12 +1814,21 @@ function showFinalCountdown(){
 
 
 // POWER-UPS
-function use5050(){
+function useBlackout(){
   if(G.pu.f50<=0||G.answered)return;G.pu.f50--;
-  document.getElementById('cnt-5050').textContent=G.pu.f50;document.getElementById('pu-5050').disabled=true;
-  const q=G.questions[G.qIdx];const wrongs=[...Array(4).keys()].filter(i=>i!==q.correct);
-  shuffle(wrongs).slice(0,2).forEach(i=>{const b=document.getElementById('ans'+i);if(b){b.style.opacity='.18';b.disabled=true;}});
-  toast('⊘ 50/50 activé !');
+  document.getElementById('cnt-5050').textContent=G.pu.f50;
+  document.getElementById('pu-5050').disabled=true;
+  // Diffuser le blackout via Supabase
+  if(sb)sb.from('rooms').update({status:'blackout_'+Date.now()}).eq('code',G.code);
+  toast('🌑 Blackout ! Écran des adversaires flou pendant 5s !');
+}
+function applyBlackout(){
+  const overlay=document.createElement('div');
+  overlay.id='blackout-overlay';
+  overlay.style.cssText='position:fixed;inset:0;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;font-size:48px';
+  overlay.textContent='🌑';
+  document.body.appendChild(overlay);
+  setTimeout(()=>{const o=document.getElementById('blackout-overlay');if(o)o.remove();},5000);
 }
 function usePuX2(){
   if(G.pu.x2<=0||G.answered)return;G.pu.x2--;G.x2Active=true;
@@ -2116,6 +2131,15 @@ document.addEventListener('input',function(e){
       preview.style.display='none';
     }
   }
+});
+
+// Touches clavier POWER UPS
+document.addEventListener('keydown',e=>{
+  if(!document.getElementById('s-game')?.classList.contains('active'))return;
+  if(G.answered)return;
+  if(e.key==='1')useBlackout();
+  else if(e.key==='2')usePuX2();
+  else if(e.key==='3')usePuD2();
 });
 
 // ── Answer tags ──
