@@ -550,7 +550,7 @@ button.ans-btn:disabled{cursor:default}
         <label style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:14px 16px;background:var(--hover);border-radius:14px;border:1px solid var(--bdr)">
           <div>
             <div style="font-weight:600;font-size:14px;color:#fff">⚡ Power-ups activés</div>
-            <div style="font-size:12px;color:var(--muted);margin-top:3px">50/50, Points x2, Diviser les autres</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:3px">Blackout, Points x2, Points /2</div>
           </div>
           <div class="toggle-wrap" onclick="toggleOpt('cr-powerups',this)">
             <input type="checkbox" id="cr-powerups" style="display:none" checked>
@@ -1568,7 +1568,7 @@ function scheduleAdvance(delay){
 // PICK ANSWER (QCM / Battle) — le chrono continue de tourner
 async function pickAns(idx){
   if(G.answered)return;
-  G.answered=true;G.selAns=idx; clearInterval(G.timerInt);
+  G.answered=true;G.selAns=idx;
   // NE PAS clearInterval(G.timerInt) — le chrono continue pour tout le monde
   const q=G.questions[G.qIdx],ok=idx===q.correct;
   const bonus=Math.round(G.timeLeft/G.settings.qTime*300);
@@ -1630,7 +1630,6 @@ async function submitText(){
 
   // Bonne réponse (ou MVP/mode texte classique)
   G.answered=true;
-  clearInterval(G.timerInt);
   const bonus=Math.round(G.timeLeft/G.settings.qTime*300);
   let pts=ok?700+bonus:0;
   if(G.x2Active&&ok){pts*=2;G.x2Active=false;}
