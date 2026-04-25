@@ -2586,7 +2586,7 @@ function updateNav(){
     if(bankBtn){
       bankBtn.style.display='none';
       if(currentUser?.supabaseId&&sb){
-        sb.from('profiles').select('is_admin').eq('id',currentUser.supabaseId).single().then(({data})=>{
+        sb.from('profiles').select('is_admin').eq('id',currentUser.supabaseId).maybeSingle().then(({data})=>{
           if(data?.is_admin)bankBtn.style.display='';
         });
       }
