@@ -980,7 +980,7 @@ async function openProfile(){
   const pn=document.getElementById('prof-name');if(pn)pn.textContent=currentUser.name||'—';
   // Charger depuis Supabase si connecté
   if(sb&&currentUser.supabaseId){
-    const{data:prof}=await sb.from('profiles').select('*').eq('id',currentUser.supabaseId).single();
+    const{data:prof}=await sb.from('profiles').select('*').eq('id',currentUser.supabaseId).maybesingle();
     if(prof){
       currentUser.profile=prof;
       currentUser.avatar=prof.avatar||currentUser.avatar;
@@ -1802,7 +1802,7 @@ async function saveGameHistory(){
     difficulty:G.settings.diff
   });
   // Mettre à jour le profil
-  const{data:prof}=await sb.from('profiles').select('*').eq('id',currentUser.supabaseId).single();
+  const{data:prof}=await sb.from('profiles').select('*').eq('id',currentUser.supabaseId).maybesingle();
   const newBest=Math.max(myScore,prof?.best_score||0);
   await sb.from('profiles').update({
     best_score:newBest,
@@ -1960,7 +1960,7 @@ async function renderBadgesProfile(){
   const el=document.getElementById('prof-badges-full');if(!el)return;
   const earned=await loadBadges();
   if(currentUser?.supabaseId&&sb){
-    const{data:prof}=await sb.from('profiles').select('is_admin').eq('id',currentUser.supabaseId).single();
+    const{data:prof}=await sb.from('profiles').select('is_admin').eq('id',currentUser.supabaseId).maybesingle();
     if(prof?.is_admin&&!earned.includes('admin'))earned.push('admin');
   }
   el.innerHTML=Object.entries(BADGES).map(([id,b])=>{
