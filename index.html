@@ -821,6 +821,7 @@ button.ans-btn:disabled{cursor:default}
       </div>
       <div id="gm-result"></div>
       <div id="gm-next" style="display:none"></div>
+      <div id="gm-player-status" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;justify-content:center"></div>
     </div>
     <div class="gside">
       <div class="slb"><div class="stitle">🏆 Classement</div><div id="gm-lb"></div></div>
@@ -867,6 +868,10 @@ button.ans-btn:disabled{cursor:default}
 <div id="s-profile" class="screen">
   <div class="page-wrap">
     <div class="page-back"><button class="btn-icon" onclick="go('home')">←</button><h2 class="page-title">Mon Profil</h2></div>
+    <div class="card" style="margin-top:16px">
+      <div class="card-title">🏅 Mes badges</div>
+      <div id="profile-badges" style="display:flex;flex-wrap:wrap;gap:10px;margin-top:8px"></div>
+    </div>
 
     <!-- Header profil -->
     <div class="prof-hdr">
@@ -878,6 +883,7 @@ button.ans-btn:disabled{cursor:default}
         <div class="prof-name" id="prof-name">—</div>
         <div class="prof-sub" id="prof-sub">Chargement…</div>
         <div class="prof-badges" id="prof-badges"></div>
+        <div id="prof-badges-full" style="display:flex;flex-wrap:wrap;gap:10px;margin-top:14px"></div>
         <button class="btn btn-ghost" style="margin-top:14px;padding:8px 18px;font-size:13px;color:var(--err);border-color:rgba(255,77,109,.3)" onclick="doLogout()">🚪 Se déconnecter</button>
       </div>
     </div>
@@ -943,7 +949,7 @@ try{
 }catch(e){
   console.error('❌ Supabase erreur',e);
 }
-const G={name:'',isHost:false,code:'',players:[],settings:{},questions:[],qIdx:0,scores:{},answered:false,selAns:null,timerInt:null,timeLeft:20,answeredCount: 0,correctCount:0,nextStarted: false,nextInt:null,dotAns:{},pu:{f50:1,x2:1,d2:1},x2Active:false,selMode:'FREE',selDiff:'normal',freeAttempts:{},lastWrongAttempt:{},lobbyPoll:null,chatPoll:null,allAnsweredPoll:null,questionStartTime:null};
+const G={name:'',isHost:false,code:'',players:[],settings:{},questions:[],playerAnswered:{},qIdx:0,scores:{},answered:false,selAns:null,timerInt:null,timeLeft:20,answeredCount: 0,correctCount:0,nextStarted: false,nextInt:null,dotAns:{},pu:{f50:1,x2:1,d2:1},x2Active:false,selMode:'FREE',selDiff:'normal',freeAttempts:{},lastWrongAttempt:{},lobbyPoll:null,chatPoll:null,allAnsweredPoll:null,questionStartTime:null};
 
 window.addEventListener('DOMContentLoaded',()=>{
   loadSession();
@@ -1002,7 +1008,8 @@ async function openProfile(){
       if(pb)pb.innerHTML=badges.map(b=>`<span class="pbadge">${b}</span>`).join('');
     }
   }
-  // Charger l'historique par défaut
+  // Charger badges et historique
+  if(currentUser?.supabaseId)renderBadgesProfile();
   loadHistory();
 }
 
@@ -1058,7 +1065,7 @@ async function createRoom(){
   // Recharger les joueurs depuis Supabase pour être sûr
   const{data:pls}=await sb.from('players').select('*').eq('room_code',G.code);
   G.players=pls||[];
-  G.players.forEach(p=>G.scores[p.name]=p.score||0);
+  G.players.forEach(p=>G.scores[p.name]=room.status==='waiting'?0:(p.score||0));
   openLobby();
 }
 
@@ -1142,6 +1149,8 @@ function subscribeRoom(){
         if(a.answer_index===null||a.answer_index===undefined)onOtherAttempt(a.player_name,a.attempt||'',a.is_correct);
       }else{
         if(G.settings.showTries&&!a.is_correct)displayWrongAttempt(a);
+        G.playerAnswered[a.player_name]=a.is_correct?'correct':'wrong';
+      renderPlayerStatus();
       }
       // Hôte : compter les bonnes réponses des autres joueurs
       if(G.isHost&&a.is_correct){
@@ -1439,6 +1448,7 @@ function fallback(cats,diff){
 function showQuestion(){
   const q=G.questions[G.qIdx];if(!q){showFinal();return;}
   G.answeredCount = 0;G.answered = false;
+  G.playerAnswered={};
   G.correctCount = 0;
   G.nextStarted = false;
   G.questionStartTime = new Date().toISOString();
@@ -1521,6 +1531,16 @@ function displayWrongAttempt(a){
   setTimeout(()=>el.remove(),4000);
 }
 
+function renderPlayerStatus(){
+  const el=document.getElementById('gm-player-status');if(!el)return;
+  el.innerHTML=G.players.map(p=>{
+    const st=G.playerAnswered[p.name];
+    const icon=st==='correct'?'✅':st==='wrong'?'❌':'⏳';
+    const col=st==='correct'?'rgba(44,255,5,.15)':st==='wrong'?'rgba(255,77,109,.12)':'rgba(255,255,255,.06)';
+    return `<div style="display:flex;align-items:center;gap:6px;padding:6px 12px;background:${col};border-radius:20px;font-size:13px;font-weight:600">${icon} ${p.name}</div>`;
+  }).join('');
+}
+
 // TIMER — tourne toujours jusqu'à 0 pour tout le monde
 function startTimer(){
   clearInterval(G.timerInt);
@@ -1569,8 +1589,12 @@ function scheduleAdvance(delay){
 async function pickAns(idx){
   if(G.answered)return;
   G.answered=true;G.selAns=idx;
-  // NE PAS clearInterval(G.timerInt) — le chrono continue pour tout le monde
   const q=G.questions[G.qIdx],ok=idx===q.correct;
+  const elapsed=(Date.now()-new Date(G.questionStartTime).getTime())/1000;
+  if(elapsed<2&&ok)unlockBadge('speed');
+  G.playerAnswered[G.name]=ok?'correct':'wrong';
+  renderPlayerStatus();
+  // NE PAS clearInterval(G.timerInt) — le chrono continue pour tout le monde
   const bonus=Math.round(G.timeLeft/G.settings.qTime*300);
   let pts=ok?700+bonus:0;
   if(G.x2Active&&ok){pts*=2;G.x2Active=false;}
@@ -1630,6 +1654,10 @@ async function submitText(){
 
   // Bonne réponse (ou MVP/mode texte classique)
   G.answered=true;
+  const elapsed=(Date.now()-new Date(G.questionStartTime).getTime())/1000;
+  if(elapsed<2&&ok)unlockBadge('speed');
+  G.playerAnswered[G.name]=ok?'correct':'wrong';
+  renderPlayerStatus();
   const bonus=Math.round(G.timeLeft/G.settings.qTime*300);
   let pts=ok?700+bonus:0;
   if(G.x2Active&&ok){pts*=2;G.x2Active=false;}
@@ -1684,6 +1712,8 @@ function onOtherAttempt(playerName,val,isCorrect){
   if(!isCorrect){
     if(!G.lastWrongAttempt)G.lastWrongAttempt={};
     G.lastWrongAttempt[playerName]=val;
+    G.playerAnswered[playerName]=isCorrect?'correct':'wrong';
+    renderPlayerStatus();
   }else{
     if(G.lastWrongAttempt)delete G.lastWrongAttempt[playerName];
   }
@@ -1782,7 +1812,15 @@ async function saveGameHistory(){
     updated_at:new Date().toISOString()
   }).eq('id',currentUser.supabaseId);
   // Mettre à jour currentUser
-  currentUser.profile={...prof,best_score:newBest,games_played:(prof?.games_played||0)+1};
+  const sorted=sortedPl();
+const isFirst=sorted[0]?.name===G.name;
+const isPerfect=correctCount===G.questions.length;
+const newPerfect=(prof?.perfect_games||0)+(isPerfect?1:0);
+const newFirstPlace=(prof?.first_place||0)+(isFirst?1:0);
+await sb.from('profiles').update({perfect_games:newPerfect,first_place:newFirstPlace}).eq('id',currentUser.supabaseId);
+const updatedProf={...prof,best_score:newBest,games_played:(prof?.games_played||0)+1,perfect_games:newPerfect,first_place:newFirstPlace};
+await checkBadges(myScore,isFirst,isPerfect,updatedProf);
+currentUser.profile=updatedProf;
   saveSession(currentUser);
   // Sauvegarder les joueurs récents
   for(const p of G.players){
@@ -1799,8 +1837,12 @@ async function saveGameHistory(){
 }
 function showFinalCountdown(){
   clearInterval(G.timerInt);
+  go('final');
+  document.getElementById('final-podium').innerHTML=`<div style="font-size:64px;animation:qfloat 1s ease-in-out infinite">🏆</div>`;
+  document.getElementById('final-rows').innerHTML='';
   document.getElementById('gm-result').innerHTML='';
   document.getElementById('gm-next').style.display='block';
+  document.getElementById('gm-lb').innerHTML='<div style="text-align:center;color:var(--muted);font-size:13px;padding:16px">🔒 Résultats cachés…</div>';
   let cd=5;
   const el=document.getElementById('gm-next');
   const render=async()=>{
@@ -1852,6 +1894,87 @@ function usePuD2(){
   });
   renderGameLB();toast('÷2 Points des adversaires divisés par 2 !');
 }
+
+// BADGES
+const BADGES = {
+  // Progression
+  first_game:    { icon:'🎮', name:'Premier pas',      desc:'Jouer sa 1ère partie' },
+  games_10:      { icon:'🔥', name:'Habitué',          desc:'10 parties jouées' },
+  games_50:      { icon:'⚡', name:'Acharné',          desc:'50 parties jouées' },
+  games_100:     { icon:'💎', name:'Légende',          desc:'100 parties jouées' },
+  // Scores
+  score_1000:    { icon:'🌟', name:'Mille points',     desc:'1 000 pts en une partie' },
+  score_5000:    { icon:'🚀', name:'En orbite',        desc:'5 000 pts en une partie' },
+  score_10000:   { icon:'💥', name:'Phénomène',        desc:'10 000 pts en une partie' },
+  // Performance
+  perfect:       { icon:'🎯', name:'Parfait',          desc:'Toutes les questions correctes en une partie' },
+  perfect_3:     { icon:'👑', name:'Machine',          desc:'3 parties parfaites' },
+  first_place:   { icon:'🥇', name:'Champion',         desc:'Terminer 1er' },
+  first_place_5: { icon:'🏆', name:'Indétrônable',     desc:'5 fois 1er' },
+  // Rapidité
+  speed:         { icon:'⚡', name:'Éclair',           desc:'Répondre en moins de 2s' },
+  // Fun
+  night_owl:     { icon:'🦉', name:'Chouette de nuit', desc:'Jouer après minuit' },
+  early_bird:    { icon:'🐦', name:'Lève-tôt',         desc:'Jouer avant 7h du matin' },
+  // Admin
+  admin:         { icon:'🛡️', name:'Admin',            desc:'Badge administrateur', special:true },
+};
+
+// Charge les badges du joueur
+async function loadBadges(){
+  if(!sb||!currentUser?.supabaseId)return[];
+  const{data}=await sb.from('badges').select('badge_id').eq('player_id',currentUser.supabaseId);
+  return data?data.map(b=>b.badge_id):[];
+}
+
+// Débloque un badge (silencieux si déjà débloqué)
+async function unlockBadge(badgeId){
+  if(!sb||!currentUser?.supabaseId||!BADGES[badgeId])return;
+  const{error}=await sb.from('badges').insert({player_id:currentUser.supabaseId,badge_id:badgeId});
+  if(!error){const b=BADGES[badgeId];toast(`${b.icon} Badge débloqué : ${b.name} !`);}
+}
+
+// Vérifie et débloque les badges après une partie (prof = données mises à jour)
+async function checkBadges(myScore,isFirst,isPerfect,prof){
+  if(!prof)return;
+  const earned=await loadBadges();
+  const unlock=id=>{if(!earned.includes(id))unlockBadge(id);};
+  const games=prof.games_played||0;
+  if(games>=1)unlock('first_game');
+  if(games>=10)unlock('games_10');
+  if(games>=50)unlock('games_50');
+  if(games>=100)unlock('games_100');
+  if(myScore>=1000)unlock('score_1000');
+  if(myScore>=5000)unlock('score_5000');
+  if(myScore>=10000)unlock('score_10000');
+  if(isPerfect)unlock('perfect');
+  if((prof.perfect_games||0)>=3)unlock('perfect_3');
+  if(isFirst)unlock('first_place');
+  if((prof.first_place||0)>=5)unlock('first_place_5');
+  const h=new Date().getHours();
+  if(h>=0&&h<5)unlock('night_owl');
+  if(h>=5&&h<7)unlock('early_bird');
+}
+
+// Affiche les badges dans le profil
+async function renderBadgesProfile(){
+  const el=document.getElementById('prof-badges-full');if(!el)return;
+  const earned=await loadBadges();
+  if(currentUser?.supabaseId&&sb){
+    const{data:prof}=await sb.from('profiles').select('is_admin').eq('id',currentUser.supabaseId).single();
+    if(prof?.is_admin&&!earned.includes('admin'))earned.push('admin');
+  }
+  el.innerHTML=Object.entries(BADGES).map(([id,b])=>{
+    const has=earned.includes(id);
+    return `<div title="${b.desc}" style="display:flex;flex-direction:column;align-items:center;gap:4px;width:72px;text-align:center;opacity:${has?1:0.25};filter:${has?'none':'grayscale(1)'}">
+      <div style="font-size:32px">${b.icon}</div>
+      <div style="font-size:10px;font-weight:700;color:${has?'var(--acc)':'var(--muted)'}">${b.name}</div>
+    </div>`;
+  }).join('');
+}
+
+// updateProfileStats est géré directement dans saveGameHistory — fonction gardée pour compatibilité
+async function updateProfileStats(myScore,isFirst,isPerfect){}
 
 // FLOATING PTS
 function spawnPts(txt){const el=document.createElement('div');el.className='pfloat';el.textContent=txt;el.style.cssText='left:50%;top:40%;transform:translateX(-50%)';document.body.appendChild(el);setTimeout(()=>el.remove(),1600);}
@@ -1941,7 +2064,7 @@ async function fetchScoresFinal(){
   if(sb){const{data}=await sb.from('players').select('name,score,avatar,color').eq('room_code',G.code);if(data)data.forEach(p=>{G.scores[p.name]=p.score||0;const pl=G.players.find(x=>x.name===p.name);if(pl){pl.score=p.score;pl.avatar=p.avatar;pl.color=p.color;}});}
   showFinalCountdown();
 }
-function showFinal(){
+async function showFinal(){
   clearInterval(G.nextInt);
   const s=sortedPl();
   const po=[1,0,2],hs=[110,155,80],cols=['#C0C0C0','#FFBE0B','#CD7F32'],brd=['rgba(192,192,192,.4)','rgba(255,190,11,.5)','rgba(205,127,50,.4)'],medals=['🥈','🥇','🥉'];
@@ -1956,6 +2079,14 @@ function showFinal(){
       </div></div>`;
   }).join('');
   renderFullLB('final-rows');go('final');sndOk();
+  const myScore = G.scores[G.name]||0;
+const sorted = sortedPl();
+const isFirst = sorted[0]?.name===G.name;
+const totalQ = G.questions.length;
+const isPerfect = G.correctCount===totalQ;
+
+await updateProfileStats(myScore, isFirst, isPerfect);
+await checkBadges(myScore, isFirst, isPerfect);
 }
 function renderFullLB(id){
   const s=sortedPl();const rc=['first','second','third'];const bc=['g','s','b'];const medals=['🥇','🥈','🥉'];
@@ -1968,8 +2099,13 @@ function renderFullLB(id){
     </div>`).join('');
 }
 async function playAgain(){
-  if(sb){await sb.from('answers').delete().eq('room_code',G.code);await sb.from('players').update({score:0,last_answer_at:null}).eq('room_code',G.code);}
-  G.players.forEach(p=>G.scores[p.name]=0);G.dotAns={};G.pu={f50:1,x2:1,d2:1};G.answered=false;G.correctCount=0;
+  G.players.forEach(p=>G.scores[p.name]=0);
+  G.dotAns={};G.pu={f50:1,x2:1,d2:1};G.answered=false;G.correctCount=0;G.playerAnswered={};
+  if(sb){
+    await sb.from('answers').delete().eq('room_code',G.code);
+    await sb.from('players').update({score:0,last_answer_at:null}).eq('room_code',G.code);
+    await sb.from('rooms').update({status:'waiting',current_q:0,questions:null}).eq('code',G.code);
+  }
   if(G.isHost)launchGame();else{openLobby();toast('⏳ En attente de l\'hôte…');}
 }
 function changeRules(){if(G.isHost){go('create-room');}else toast('Seul l\'hôte peut changer les règles');}
@@ -2447,7 +2583,15 @@ function updateNav(){
   const sb2=document.getElementById('nav-signup-btn');
   if(currentUser){
     if(pb){pb.style.display='';pb.textContent='👤 '+currentUser.name;}
-    const bankBtn=document.getElementById('nav-bank-btn');if(bankBtn)bankBtn.style.display='';
+    const bankBtn=document.getElementById('nav-bank-btn');
+    if(bankBtn){
+      bankBtn.style.display='none';
+      if(currentUser?.supabaseId&&sb){
+        sb.from('profiles').select('is_admin').eq('id',currentUser.supabaseId).single().then(({data})=>{
+          if(data?.is_admin)bankBtn.style.display='';
+        });
+      }
+    }
     if(lb)lb.style.display='none';
     if(sb2){sb2.textContent='Créer une partie ⚡';sb2.onclick=()=>go('create-room');}
     // Update profile page
