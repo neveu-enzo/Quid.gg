@@ -1065,7 +1065,7 @@ async function createRoom(){
   // Recharger les joueurs depuis Supabase pour être sûr
   const{data:pls}=await sb.from('players').select('*').eq('room_code',G.code);
   G.players=pls||[];
-  G.players.forEach(p=>G.scores[p.name]=room.status==='waiting'?0:(p.score||0));
+  G.players.forEach(p=>G.scores[p.name]=0);
   openLobby();
 }
 
@@ -2538,7 +2538,7 @@ async function doLogin(){
       if(data.user){
         const name=data.user.user_metadata?.name||email.split('@')[0];
         // Charger le profil depuis Supabase
-      const{data:prof}=await sb.from('profiles').select('*').eq('id',data.user.id).single();
+      const{data:prof}=await sb.from('profiles').select('*').eq('id',data.user.id).maybeSingle();
       currentUser={name:prof?.name||name,email,avatar:prof?.avatar||'🦊',supabaseId:data.user.id,profile:prof};
       saveSession(currentUser);updateNav();
       setBtnLoading('login-btn',false);
@@ -2720,7 +2720,7 @@ async function loadRecents(){
 async function addFriend(){
   const inp=document.getElementById('friend-search-inp');
   const name=inp?.value.trim();if(!name){toast('⚠ Entre un pseudo','err');return;}
-  const{data:prof}=await sb.from('profiles').select('id,name').eq('name',name).single();
+  const{data:prof}=await sb.from('profiles').select('id,name').eq('name',name).maybeSingle();
   if(!prof){toast('❌ Joueur introuvable','err');return;}
   if(prof.id===currentUser.supabaseId){toast('❌ Tu ne peux pas t\'ajouter toi-même','err');return;}
   const{error}=await sb.from('friendships').insert({user_id:currentUser.supabaseId,friend_id:prof.id,status:'pending'});
@@ -2729,7 +2729,7 @@ async function addFriend(){
 }
 
 async function addFriendByName(name){
-  const{data:prof}=await sb.from('profiles').select('id,name').eq('name',name).single();
+  const{data:prof}=await sb.from('profiles').select('id,name').eq('name',name).maybeSingle();
   if(!prof){toast('❌ Joueur introuvable','err');return;}
   const{error}=await sb.from('friendships').insert({user_id:currentUser.supabaseId,friend_id:prof.id,status:'pending'});
   if(error){toast('❌ Demande déjà envoyée ou déjà ami','err');return;}
@@ -2739,13 +2739,13 @@ async function addFriendByName(name){
 async function acceptFriend(friendshipId){
   await sb.from('friendships').update({status:'accepted'}).eq('id',friendshipId);
   // Créer la relation inverse aussi
-  const{data:f}=await sb.from('friendships').select('*').eq('id',friendshipId).single();
+  const{data:f}=await sb.from('friendships').select('*').eq('id',friendshipId).maybeSingle();
   if(f)await sb.from('friendships').upsert({user_id:f.friend_id,friend_id:f.user_id,status:'accepted'},{onConflict:'user_id,friend_id'});
   toast('✅ Ami ajouté !','ok');loadFriends();
 }
 
 async function removeFriend(friendshipId){
-  const{data:f}=await sb.from('friendships').select('*').eq('id',friendshipId).single();
+  const{data:f}=await sb.from('friendships').select('*').eq('id',friendshipId).maybeSingle();
   await sb.from('friendships').delete().eq('id',friendshipId);
   if(f) await sb.from('friendships').delete().eq('user_id',f.friend_id).eq('friend_id',f.user_id);
   toast('Ami retiré','ok');
