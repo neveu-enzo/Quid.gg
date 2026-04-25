@@ -1812,15 +1812,14 @@ async function saveGameHistory(){
     updated_at:new Date().toISOString()
   }).eq('id',currentUser.supabaseId);
   // Mettre à jour currentUser
-  const sorted=sortedPl();
-const isFirst=sorted[0]?.name===G.name;
-const isPerfect=correctCount===G.questions.length;
-const newPerfect=(prof?.perfect_games||0)+(isPerfect?1:0);
-const newFirstPlace=(prof?.first_place||0)+(isFirst?1:0);
-await sb.from('profiles').update({perfect_games:newPerfect,first_place:newFirstPlace}).eq('id',currentUser.supabaseId);
-const updatedProf={...prof,best_score:newBest,games_played:(prof?.games_played||0)+1,perfect_games:newPerfect,first_place:newFirstPlace};
-await checkBadges(myScore,isFirst,isPerfect,updatedProf);
-currentUser.profile=updatedProf;
+  const isFirst=sorted[0]?.name===G.name;
+  const isPerfect=correctCount===G.questions.length;
+  const newPerfect=(prof?.perfect_games||0)+(isPerfect?1:0);
+  const newFirstPlace=(prof?.first_place||0)+(isFirst?1:0);
+  await sb.from('profiles').update({perfect_games:newPerfect,first_place:newFirstPlace}).eq('id',currentUser.supabaseId);
+  const updatedProf={...prof,best_score:newBest,games_played:(prof?.games_played||0)+1,perfect_games:newPerfect,first_place:newFirstPlace};
+  await checkBadges(myScore,isFirst,isPerfect,updatedProf);
+  currentUser.profile=updatedProf;
   saveSession(currentUser);
   // Sauvegarder les joueurs récents
   for(const p of G.players){
