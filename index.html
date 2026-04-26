@@ -618,6 +618,7 @@ button.ans-btn:disabled{cursor:default}
           <option value="normal">⚡ Normal</option>
           <option value="expert">🔥 Expert</option>
         </select>
+        <button class="btn btn-outline" style="padding:9px 18px;font-size:13px" onclick="exportBank()">📥 Exporter</button>
         <button class="btn btn-danger" style="padding:11px 16px;font-size:13px" onclick="clearCustomQuestions()">🗑 Vider les importées</button>
       </div>
       <div id="bk-list"></div>
@@ -1195,35 +1196,34 @@ function openLobby(){
   if(G.lobbyPoll)clearInterval(G.lobbyPoll);
   G.lobbyPoll=setInterval(async()=>{
     if(!sb||!G.code)return;
-    // Joueurs — sync complète pour tout le monde
     const{data:pls}=await sb.from('players').select('*').eq('room_code',G.code);
     if(pls){
       let changed=false;
-      // Détecter nouveaux joueurs
       pls.forEach(p=>{
         if(!G.players.find(x=>x.name===p.name)){
           G.players.push(p);G.scores[p.name]=0;changed=true;
           if(p.name!==G.name)toast('👋 '+p.name+' a rejoint !','ok');
         }
       });
-      // Détecter joueurs supprimés (exclus)
       const plsNames=new Set(pls.map(p=>p.name));
       G.players.forEach(p=>{
         if(!plsNames.has(p.name)){
           if(p.name===G.name){
-            // Je suis exclu
             clearInterval(G.lobbyPoll);
             toast('🚫 Tu as été exclu du salon','err');
             setTimeout(()=>go('home'),2000);
-          }else{
-            changed=true;
-          }
+          }else{changed=true;}
         }
       });
       G.players=G.players.filter(p=>plsNames.has(p.name));
-      if(changed){renderPlayers();renderLobbyAction();}
+      // Sync is_ready et scores depuis Supabase
+      pls.forEach(p=>{
+        const local=G.players.find(x=>x.name===p.name);
+        if(local){local.is_ready=p.is_ready;G.scores[p.name]=p.score||0;}
+      });
+      if(changed)renderPlayers();
+      renderLobbyAction();
     }
-    // Messages (lobby + jeu = même chat)
     const{data:msgs}=await sb.from('messages')
       .select('*').eq('room_code',G.code)
       .order('created_at',{ascending:true});
@@ -1241,15 +1241,31 @@ function openLobby(){
     }
   },2000);
 }
+
 function renderPlayers(){
   document.getElementById('lb-players').innerHTML=G.players.map(p=>`
     <div class="pchip ${p.isHost?'host':''} ${p.name===G.name?'me':''}">
       <span class="pav">${p.avatar||'🎮'}</span>
       <div class="pnm">${p.name}</div>
       ${p.isHost?'<div class="prole">Hôte</div>':''}
+      ${p.is_ready?'<div style="font-size:10px;color:var(--acc);font-weight:700;margin-top:2px">✓ Prêt</div>':'<div style="font-size:10px;color:var(--muted);margin-top:2px">⏳</div>'}
       ${G.isHost&&!p.isHost&&p.name!==G.name?`<button onclick="kickPlayer('${p.name}')" style="background:none;border:none;cursor:pointer;font-size:14px;color:var(--err);padding:2px;margin-top:4px;display:block;width:100%;text-align:center" title="Exclure">✕</button>`:''}
     </div>`).join('');
   document.getElementById('lb-pcount').textContent=G.players.length+'/8';
+}
+
+async function launchGame(){
+  go('loading');sndStart();
+  const{data:roomData}=await sb.from('rooms').select('used_questions').eq('code',G.code).maybeSingle();
+  const usedQs=roomData?.used_questions||[];
+  G.questions=shuffle(await fetchQs(G.settings.categories.join(', '),G.settings.qCount,G.settings.diff,G.settings.mode,usedQs));
+  G.qIdx=0;
+  G.players.forEach(p=>G.scores[p.name]=0);
+  G.dotAns={};G.pu={f50:1,x2:1,d2:1};G.x2Active=false;
+  const newUsed=[...new Set([...usedQs,...G.questions.map(q=>(q.question||'').toLowerCase().trim())])];
+  await sb.from('players').update({score:0,is_ready:false}).eq('room_code',G.code);
+  await sb.from('rooms').update({status:'playing',questions:G.questions,current_q:0,used_questions:newUsed}).eq('code',G.code);
+  showQuestion();
 }
 
 async function kickPlayer(name){
@@ -1286,8 +1302,17 @@ function renderLobbySettings(){
 }
 function renderLobbyAction(){
   const el=document.getElementById('lb-action');
-  if(G.isHost){el.innerHTML=`<button class="btn btn-acc btn-full" style="padding:16px;font-size:16px;margin-top:4px" onclick="launchGame()">⚡ Lancer la partie (${G.players.length} joueur${G.players.length>1?'s':''})</button>`;}
-  else{el.innerHTML=`<div class="wb"><p style="color:var(--muted);font-size:14px">En attente que l'hôte lance la partie…</p><div class="wdots"><span class="wd"></span><span class="wd"></span><span class="wd"></span></div></div>`;}
+  if(G.isHost){
+    const total=G.players.length;
+    const ready=G.players.filter(p=>p.is_ready).length;
+    const allReady=ready>=total&&total>0;
+    el.innerHTML=`
+      <div style="text-align:center;margin-bottom:8px;font-size:13px;color:var(--muted)">${ready}/${total} joueur${total>1?'s':''} prêt${ready>1?'s':''}</div>
+      <button class="btn btn-acc btn-full" style="padding:16px;font-size:16px;margin-top:4px;opacity:${allReady?1:0.4};pointer-events:${allReady?'auto':'none'}" onclick="launchGame()">⚡ Lancer la partie</button>
+      ${!allReady?'<div style="text-align:center;margin-top:8px;font-size:12px;color:var(--muted)">En attente que tous les joueurs cliquent sur Rejouer…</div>':''}`;
+  }else{
+    el.innerHTML=`<div class="wb"><p style="color:var(--muted);font-size:14px">En attente que l'hôte lance la partie…</p><div class="wdots"><span class="wd"></span><span class="wd"></span><span class="wd"></span></div></div>`;
+  }
 }
 function copyCode(){navigator.clipboard.writeText(G.code).catch(()=>{});document.getElementById('copy-icon').textContent='✅';toast('✅ Code '+G.code+' copié !','ok');setTimeout(()=>document.getElementById('copy-icon').textContent='📋',2000);}
 function shareRoom(){if(navigator.share)navigator.share({title:'Quid.gg',text:`Rejoins ma partie ! Code : ${G.code}`,url:location.href});else copyCode();}
@@ -1303,6 +1328,68 @@ async function launchGame(){
   const newUsed=[...new Set([...usedQs,...G.questions.map(q=>(q.question||'').toLowerCase().trim())])];
   await sb.from('rooms').update({status:'playing',questions:G.questions,current_q:0,used_questions:newUsed}).eq('code',G.code);
   showQuestion();
+}
+
+function exportBank(){
+  const search=(document.getElementById('bk-search')?.value||'').toLowerCase();
+  const filterCat=document.getElementById('bk-filter-cat')?.value||'';
+  const filterDiff=document.getElementById('bk-filter-diff')?.value||'';
+  let qs=[...bankCache];
+  if(search)qs=qs.filter(q=>(q.question||'').toLowerCase().includes(search)||(q.category||'').toLowerCase().includes(search));
+  if(filterCat)qs=qs.filter(q=>q.category===filterCat);
+  if(filterDiff)qs=qs.filter(q=>q.difficulty===filterDiff||q.diff===filterDiff);
+  const blob=new Blob([JSON.stringify(qs,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`quidgg_questions_${filterCat||'toutes'}_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  toast(`📥 ${qs.length} question${qs.length>1?'s':''} exportée${qs.length>1?'s':''}`);
+}
+
+function editQuestion(id){
+  const q=bankCache.find(x=>(x.id||x.rowid)==id);
+  if(!q)return;
+  const answers=Array.isArray(q.answers)?q.answers.join('|'):(q.answer||'');
+  const html=`
+    <div style="position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px" onclick="this.remove()">
+      <div style="background:var(--card);border-radius:20px;padding:24px;max-width:480px;width:100%;max-height:85vh;overflow-y:auto" onclick="event.stopPropagation()">
+        <div style="font-size:16px;font-weight:800;margin-bottom:16px">✏️ Modifier la question</div>
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div><label style="font-size:12px;color:var(--muted);font-weight:600">QUESTION</label>
+            <textarea id="eq-question" rows="3" class="form-input" style="width:100%;margin-top:4px;resize:vertical">${q.question||''}</textarea></div>
+          <div><label style="font-size:12px;color:var(--muted);font-weight:600">RÉPONSE(S) ACCEPTÉES (séparées par |)</label>
+            <input id="eq-answers" class="form-input" style="width:100%;margin-top:4px" value="${answers}"/></div>
+          <div><label style="font-size:12px;color:var(--muted);font-weight:600">CATÉGORIE</label>
+            <input id="eq-cat" class="form-input" style="width:100%;margin-top:4px" value="${q.category||''}"/></div>
+          <div><label style="font-size:12px;color:var(--muted);font-weight:600">EXPLICATION (optionnel)</label>
+            <input id="eq-expl" class="form-input" style="width:100%;margin-top:4px" value="${q.explanation||''}"/></div>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button class="btn btn-acc" style="flex:1;padding:12px" onclick="saveEditQuestion('${id}',this)">💾 Sauvegarder</button>
+            <button class="btn btn-outline" style="padding:12px" onclick="this.closest('[style*=fixed]').remove()">Annuler</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  document.body.insertAdjacentHTML('beforeend',html);
+}
+
+async function saveEditQuestion(id,btn){
+  const question=document.getElementById('eq-question').value.trim();
+  const answers=document.getElementById('eq-answers').value.split('|').map(a=>a.trim()).filter(Boolean);
+  const category=document.getElementById('eq-cat').value.trim();
+  const explanation=document.getElementById('eq-expl').value.trim();
+  if(!question||!answers.length){toast('❌ Question et réponse obligatoires','err');return;}
+  btn.textContent='⏳ Sauvegarde…';btn.disabled=true;
+  if(sb){
+    const{error}=await sb.from('questions').update({question,answers,answer:answers[0],category,explanation}).eq('id',id);
+    if(error){toast('❌ Erreur : '+error.message,'err');btn.textContent='💾 Sauvegarder';btn.disabled=false;return;}
+  }
+  // Mettre à jour le cache local
+  const idx=bankCache.findIndex(x=>(x.id||x.rowid)==id);
+  if(idx>-1)bankCache[idx]={...bankCache[idx],question,answers,answer:answers[0],category,explanation};
+  btn.closest('[style*=fixed]').remove();
+  renderBank();
+  toast('✅ Question modifiée !');
 }
 
 // FETCH QUESTIONS — banque DB en priorité, puis IA, puis fallback intégré
@@ -2162,12 +2249,10 @@ async function playAgain(){
   G.dotAns={};G.pu={f50:1,x2:1,d2:1};G.answered=false;G.correctCount=0;G.playerAnswered={};
   if(sb){
     await sb.from('answers').delete().eq('room_code',G.code);
-    await sb.from('players').update({score:0,last_answer_at:null}).eq('room_code',G.code);
+    await sb.from('players').update({score:0,last_answer_at:null,is_ready:true}).eq('room_code',G.code).eq('name',G.name);
     await sb.from('rooms').update({status:'waiting',current_q:0,questions:null}).eq('code',G.code);
   }
   openLobby();
-  if(G.isHost)toast('✅ Prêt ! Lance la partie quand tout le monde est là.');
-  else toast('⏳ En attente de l\'hôte…');
 }
 function changeRules(){
   if(!G.isHost){toast('Seul l\'hôte peut changer les règles');return;}
@@ -2285,6 +2370,7 @@ function renderBank(){
       </div>
       ${q.explanation?`<div class="bq-expl">💡 ${q.explanation}</div>`:''}
       <div class="bq-actions">
+        <button class="btn btn-outline" style="padding:6px 14px;font-size:12px" onclick="editQuestion('${q.id||q.rowid}')">✏️ Modifier</button>
         <button class="btn btn-danger" style="padding:6px 14px;font-size:12px" onclick="deleteQuestion('${q.id||q.rowid}')">🗑 Supprimer</button>
       </div>
     </div>`;
