@@ -1395,6 +1395,7 @@ async function saveEditQuestion(id,btn){
 
 // FETCH QUESTIONS — banque DB en priorité, puis IA, puis fallback intégré
 async function fetchQs(cats,n,diff,mode,usedQs=[]){
+  const usedSet=new Set((usedQs||[]).map(q=>(q||'').toLowerCase().trim()));
   // 1. Essayer la banque de questions
   await loadBank();
   if(bankCache.length>=n){
@@ -1403,32 +1404,30 @@ async function fetchQs(cats,n,diff,mode,usedQs=[]){
     // Filter by category
     if(catList.length&&catList[0]){
       const filtered=pool.filter(q=>{
-        // Supporte q.categories (array) ou q.category (string)
         const qCats=Array.isArray(q.categories)?q.categories:[(q.category||'')];
         return catList.some(cat=>qCats.some(qc=>qc.toLowerCase().includes(cat)||cat.includes(qc.toLowerCase())));
       });
       if(filtered.length>=n)pool=filtered;
     }
-    // Filter by difficulty — supporte q.difficulties (array) ou q.difficulty (string)
+    // Filter by difficulty
     const byDiff=pool.filter(q=>{
       const qDiffs=Array.isArray(q.difficulties)?q.difficulties:[(q.difficulty||q.diff||'normal')];
       return qDiffs.includes(diff);
     });
     if(byDiff.length>=n)pool=byDiff;
     if(pool.length>=n){
-      // Exclure les questions déjà posées dans cette partie
-      const alreadyAsked=new Set([...(G.questions||[]).map(q=>q.question?.toLowerCase().trim()),...(usedQs||[])]);
+      // Exclure les questions déjà posées dans ce salon (parties précédentes + partie en cours)
+      const alreadyAsked=new Set([...(G.questions||[]).map(q=>(q.question||'').toLowerCase().trim()),...usedSet]);
       const fresh=pool.filter(q=>!alreadyAsked.has((q.question||'').toLowerCase().trim()));
-      const source=fresh.length>=n?fresh:pool; // fallback si pas assez de nouvelles
+      const source=fresh.length>=n?fresh:pool;
       return shuffle(source).slice(0,n).map(q=>({...q,answers:Array.isArray(q.answers)?q.answers:(q.answer?[q.answer]:[]),answer:Array.isArray(q.answers)?q.answers[0]:q.answer}));
     }
   }
-  // 2. IA si clef dispo
+  // 2. Fallback si pas de clé IA
   if(ANTHROPIC_KEY.startsWith('REMPLACE')){
-    const alreadyAsked=new Set([...(G.questions||[]).map(q=>q.question?.toLowerCase().trim()),...(usedQs||[])]);
+    const alreadyAsked=new Set([...(G.questions||[]).map(q=>(q.question||'').toLowerCase().trim()),...usedSet]);
     const fb=fallback(cats,diff).filter(q=>!alreadyAsked.has((q.question||'').toLowerCase().trim()));
     const selected=shuffle(fb.length>=n?fb:fallback(cats,diff)).slice(0,n);
-    // Sauvegarder aussi les questions du fallback dans la banque
     for(const q of selected){
       const exists=bankCache.some(b=>b.question&&b.question.toLowerCase().trim()===q.question.toLowerCase().trim());
       if(!exists){
@@ -1453,15 +1452,16 @@ async function fetchQs(cats,n,diff,mode,usedQs=[]){
     }
     return selected;
   }
+  // 3. IA
   const isText=mode==='FREE'||mode==='MVP';
-  const diffInstructions = {
-    easy: 'FACILE : questions très connues, réponses évidentes pour le grand public. Exemples : capitales des grands pays, acteurs célèbres, événements historiques majeurs, logos de marques mondiales. Tout le monde doit pouvoir répondre.',
-    normal: 'NORMAL : culture générale standard. Ni trop facile ni trop dur. Mélange de questions populaires et légèrement pointues. La moitié des joueurs doit pouvoir répondre.',
-    expert: 'EXPERT : questions très difficiles, pointues, qui nécessitent une vraie culture générale approfondie. Détails historiques précis, personnalités moins connues, faits scientifiques complexes, géographie avancée. Seuls les experts répondent correctement.'
+  const diffInstructions={
+    easy:'FACILE : questions très connues, réponses évidentes pour le grand public. Exemples : capitales des grands pays, acteurs célèbres, événements historiques majeurs, logos de marques mondiales. Tout le monde doit pouvoir répondre.',
+    normal:'NORMAL : culture générale standard. Ni trop facile ni trop dur. Mélange de questions populaires et légèrement pointues. La moitié des joueurs doit pouvoir répondre.',
+    expert:'EXPERT : questions très difficiles, pointues, qui nécessitent une vraie culture générale approfondie. Détails historiques précis, personnalités moins connues, faits scientifiques complexes, géographie avancée. Seuls les experts répondent correctement.'
   };
-  const alreadyAsked=(G.questions||[]).map(q=>q.question).filter(Boolean);
-  const avoidInstructions=alreadyAsked.length?`INTERDIT : Ces questions ont déjà été posées, ne les répète PAS et ne pose pas de questions similaires : ${alreadyAsked.map(q=>`"${q}"`).join(', ')}. `:'';
-  const catInstructions = `OBLIGATOIRE : Les questions DOIVENT porter EXCLUSIVEMENT sur ces catégories : ${cats}. Ne génère AUCUNE question hors de ces catégories. Varie bien entre elles. ${avoidInstructions}`;
+  const alreadyAsked=[...(G.questions||[]).map(q=>q.question).filter(Boolean),...usedSet];
+  const avoidInstructions=alreadyAsked.length?`INTERDIT : Ces questions ont déjà été posées dans ce salon, ne les répète PAS et ne pose pas de questions similaires : ${alreadyAsked.map(q=>`"${q}"`).join(', ')}. `:'';
+  const catInstructions=`OBLIGATOIRE : Les questions DOIVENT porter EXCLUSIVEMENT sur ces catégories : ${cats}. Ne génère AUCUNE question hors de ces catégories. Varie bien entre elles. ${avoidInstructions}`;
   const prompt=`Génère ${n} questions de culture générale.
 ${catInstructions}
 Niveau de difficulté : ${diffInstructions[diff]||diffInstructions.normal}
@@ -1469,7 +1469,7 @@ Mode de réponse : ${isText?'Réponse écrite libre (1 mot ou courte phrase). Fo
 Types de questions à varier : texte classique, image (drapeaux=emoji du drapeau, logos de marques=emoji, monuments=emoji, personnages célèbres=emoji, extraits cinéma=emoji thématique).
 Mélange aléatoire l'ordre des questions. Ne commence pas toutes les questions de la même façon.
 RÉPONDS UNIQUEMENT avec ce JSON valide, sans markdown, sans texte avant ou après :
-{"questions":[{"category":"NomCategorie","type":"text|image","question":"La question ?","${isText?'answer":"réponse exacte"':'"options":["Option A","Option B","Option C","Option D"],"correct":0'},"explanation":"Explication courte et intéressante en 1 phrase."}]}`;
+{"questions":[{"category":"NomCategorie","type":"text|image","question":"La question ?","${isText?'answer":"réponse exacte"':'options":["Option A","Option B","Option C","Option D"],"correct":0'},"explanation":"Explication courte et intéressante en 1 phrase."}]}`;
   try{
     const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:2000,messages:[{role:'user',content:prompt}]})});
     const d=await r.json();
