@@ -821,7 +821,6 @@ button.ans-btn:disabled{cursor:default}
       </div>
       <div id="gm-result"></div>
       <div id="gm-next" style="display:none"></div>
-      <div id="gm-player-status" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;justify-content:center"></div>
     </div>
     <div class="gside">
       <div class="slb"><div class="stitle">🏆 Classement</div><div id="gm-lb"></div></div>
@@ -1150,7 +1149,8 @@ function subscribeRoom(){
       }else{
         if(G.settings.showTries&&!a.is_correct)displayWrongAttempt(a);
         G.playerAnswered[a.player_name]=a.is_correct?'correct':'wrong';
-      renderPlayerStatus();
+        renderGameLB();
+        renderPlayerStatus();
       }
       // Hôte : compter les bonnes réponses des autres joueurs
       if(G.isHost&&a.is_correct){
@@ -1630,10 +1630,13 @@ async function submitText(){
   const q=G.questions[G.qIdx];
   // Support multi-answers: q.answers = ['Paris','paris','PARIS'] OR q.answer = 'Paris'
   const validAnswers=Array.isArray(q.answers)&&q.answers.length?q.answers:[q.answer||''];
-  const valLow=val.toLowerCase().trim();
+  const normalize=s=>s.toLowerCase().trim()
+  .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+  .replace(/[^a-z0-9\s]/g,'').replace(/\s+/g,' ');
+  const valNorm=normalize(val);
   const ok=validAnswers.some(a=>{
-    const aLow=(a||'').toLowerCase().trim();
-    return valLow===aLow||(aLow.length>2&&(aLow.includes(valLow)||valLow.includes(aLow))&&valLow.length>2);
+    const aNorm=normalize(a||'');
+    return valNorm===aNorm||(aNorm.length>2&&(aNorm.includes(valNorm)||valNorm.includes(aNorm))&&valNorm.length>2);
   });
   const isFreeMode=G.settings.mode==='FREE';
 
@@ -1747,13 +1750,14 @@ function timeUp(){
   const inp=document.getElementById('ans-inp');if(inp)inp.disabled=true;
   G.dotAns[G.qIdx]='wrong';sndFail();
   const acceptedDisplay=Array.isArray(q.answers)&&q.answers.length?q.answers[0]:q.answer;
-  document.getElementById('gm-result').innerHTML=`<div class="rbox time"><span class="ri">⏱</span><div class="rt time">Temps écoulé !</div><div class="rsub">Bonne réponse : ${acceptedDisplay||''}</div>${q.explanation?`<div class="qexpl" style="margin-top:10px"><strong>💡 Le saviez-vous ?</strong> ${q.explanation}</div>`:''}</div>`;
+  document.getElementById('gm-result').innerHTML=`<div class="rbox time"><span class="ri">⏱</span><div class="rt time">Temps écoulé !</div><div style="margin:10px 0;padding:10px 16px;background:rgba(44,255,5,.12);border:2px solid var(--acc);border-radius:12px;font-size:17px;font-weight:800;color:var(--acc);text-align:center">✅ ${acceptedDisplay||''}</div>${q.explanation?`<div class="qexpl" style="margin-top:10px"><strong>💡 Le saviez-vous ?</strong> ${q.explanation}</div>`:''}</div>`;
   // showWaitingForNext() et scheduleAdvance() sont appelés par startTimer juste après
 }
+
 function showResultBox(ok,pts,bonus,expl,correctAns){
   document.getElementById('gm-result').innerHTML=ok
     ?`<div class="rbox ok"><span class="ri">✅</span><div class="rt ok">Bonne réponse !</div><div class="rpts">+${pts} pts</div><div class="rsub">dont +${bonus} bonus vitesse</div>${expl?`<div class="qexpl" style="margin-top:12px"><strong>💡 Le saviez-vous ?</strong> ${expl}</div>`:''}</div>`
-    :`<div class="rbox bad"><span class="ri">❌</span><div class="rt bad">Raté !</div><div class="rsub">Bonne réponse : ${correctAns}</div>${expl?`<div class="qexpl" style="margin-top:10px"><strong>💡 Le saviez-vous ?</strong> ${expl}</div>`:''}</div>`;
+    :`<div class="rbox bad"><span class="ri">❌</span><div class="rt bad">Raté !</div><div style="margin:10px 0;padding:10px 16px;background:rgba(44,255,5,.12);border:2px solid var(--acc);border-radius:12px;font-size:17px;font-weight:800;color:var(--acc);text-align:center">✅ ${correctAns}</div>${expl?`<div class="qexpl" style="margin-top:10px"><strong>💡 Le saviez-vous ?</strong> ${expl}</div>`:''}</div>`;
 }
 
 // checkAllAnswered et startNextCd supprimés — la progression est pilotée par le chrono
@@ -1984,12 +1988,14 @@ if(!G.lastWrongAttempt)G.lastWrongAttempt={};
 
 function renderGameLB(){
   const s=sortedPl();const medals=['🥇','🥈','🥉'];const rc=['r1','r2','r3','ro'];
-  const showTries=G.settings.showTries&&G.settings.mode==='FREE';
   document.getElementById('gm-lb').innerHTML=s.slice(0,6).map((p,i)=>{
-    const wrong=showTries&&G.lastWrongAttempt[p.name]
-      ?`<div style="font-size:10px;color:var(--err);margin-top:2px;font-style:italic;opacity:.8">❌ ${G.lastWrongAttempt[p.name]}</div>`
-      :'';
-    return`<div class="lbrow ${i===0?'crown':''} ${p.name===G.name?'me':''}">
+    const st=G.playerAnswered[p.name];
+    const bg=st==='correct'?'background:rgba(44,255,5,.15);border-left:3px solid var(--acc);'
+             :st==='wrong'?'background:rgba(255,77,109,.12);border-left:3px solid var(--err);'
+             :'';
+    const wrong=G.settings.showTries&&G.settings.mode==='FREE'&&G.lastWrongAttempt[p.name]
+      ?`<div style="font-size:10px;color:var(--err);margin-top:2px;font-style:italic;opacity:.8">❌ ${G.lastWrongAttempt[p.name]}</div>`:'';
+    return`<div class="lbrow ${i===0?'crown':''} ${p.name===G.name?'me':''}" style="${bg}transition:background .3s,border .3s">
       <span class="lbrank ${rc[i]||'ro'}">${i<3?medals[i]:i+1}</span>
       <span class="lbav">${p.avatar||'🎮'}</span>
       <div class="lbnm" style="display:flex;flex-direction:column;gap:0">
@@ -2281,14 +2287,6 @@ document.addEventListener('input',function(e){
   }
 });
 
-// Touches clavier POWER UPS
-document.addEventListener('keydown',e=>{
-  if(!document.getElementById('s-game')?.classList.contains('active'))return;
-  if(G.answered)return;
-  if(e.key==='1')useBlackout();
-  else if(e.key==='2')usePuX2();
-  else if(e.key==='3')usePuD2();
-});
 
 // ── Answer tags ──
 let bankCatTags=[];
@@ -2493,7 +2491,16 @@ async function doSignup(){
         }
         currentUser={name,email,avatar:'🦊',supabaseId:data.user.id};
         // Créer le profil en base
-        await sb.from('profiles').upsert({id:data.user.id,name,avatar:'🦊'});
+        await sb.from('profiles').upsert({
+  id: data.user.id,
+  name: name,
+  avatar: selectedAvatar || '🦊',
+  games_played: 0,
+  best_score: 0,
+  total_correct: 0,
+  total_questions: 0,
+  is_admin: false
+});
         saveSession(currentUser);updateNav();
         setBtnLoading('signup-btn',false);
         go('home');toast('🎉 Bienvenue '+name+' !','ok');return;
