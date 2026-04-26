@@ -1296,14 +1296,12 @@ function shareRoom(){if(navigator.share)navigator.share({title:'Quid.gg',text:`R
 async function launchGame(){
   // Stop host polling if demo mode
   go('loading');sndStart();
-  const{data:roomData}=await sb.from('rooms').select('used_questions').eq('code',G.code).single();
+  const{data:roomData}=await sb.from('rooms').select('used_questions').eq('code',G.code).maybeSingle();
   const usedQs=roomData?.used_questions||[];
-  G.usedQuestions=usedQs;
   G.questions=shuffle(await fetchQs(G.settings.categories.join(', '),G.settings.qCount,G.settings.diff,G.settings.mode,usedQs));
-  const newUsed=[...usedQs,...G.questions.map(q=>q.question?.toLowerCase().trim()).filter(Boolean)];
-  await sb.from('rooms').update({used_questions:newUsed}).eq('code',G.code);
   G.qIdx=0;G.players.forEach(p=>G.scores[p.name]=0);G.dotAns={};G.pu={f50:1,x2:1,d2:1};G.x2Active=false;
-  await sb.from('rooms').update({status:'playing',questions:G.questions,current_q:0}).eq('code',G.code);
+  const newUsed=[...new Set([...usedQs,...G.questions.map(q=>(q.question||'').toLowerCase().trim())])];
+  await sb.from('rooms').update({status:'playing',questions:G.questions,current_q:0,used_questions:newUsed}).eq('code',G.code);
   showQuestion();
 }
 
@@ -1497,7 +1495,10 @@ function showQuestion(){
     aEl.innerHTML=(q.options||[]).map((o,i)=>`<button class="ans-btn" id="ans${i}" onclick="pickAns(${i})"><span class="altr">${L[i]}</span><span class="atxt">${o}</span><span class="achk">✓</span></button>`).join('');
   }
   // power-ups state
-  const puEnabled=G.settings.powerups!==false;['5050','x2','d2'].forEach(k=>{const el=document.getElementById('pu-'+k),cnt=document.getElementById('cnt-'+k);const key=k==='5050'?'f50':k;cnt.textContent=G.pu[key];el.disabled=!puEnabled||G.pu[key]<=0;if(el)el.style.opacity=!puEnabled?'0.2':'';});
+  const puEnabled=G.settings.powerups!==false;
+  const puWrap=document.getElementById('pu-5050')?.parentElement;
+  if(puWrap)puWrap.style.display=puEnabled?'':'none';
+  ['5050','x2','d2'].forEach(k=>{const el=document.getElementById('pu-'+k),cnt=document.getElementById('cnt-'+k);if(!el)return;const key=k==='5050'?'f50':k;cnt.textContent=G.pu[key];el.disabled=G.pu[key]<=0;el.style.opacity='';});
   renderGameLB();startTimer();go('game');
 
 
@@ -2162,34 +2163,28 @@ async function playAgain(){
   if(sb){
     await sb.from('answers').delete().eq('room_code',G.code);
     await sb.from('players').update({score:0,last_answer_at:null}).eq('room_code',G.code);
-    await sb.from('rooms').update({status:'waiting',current_q:0,questions:null}).eq('code',G.code);
   }
   if(G.isHost)launchGame();else{openLobby();toast('⏳ En attente de l\'hôte…');}
 }
 function changeRules(){
   if(!G.isHost){toast('Seul l\'hôte peut changer les règles');return;}
-  // Pré-remplir les settings actuels et afficher l'écran create-room
   go('create-room');
-  // Changer le bouton "Créer" en "Appliquer et relancer"
-  const createBtn=document.querySelector('#s-create-room .btn-acc');
+  const createBtn=document.querySelector('#s-create-room button.btn-acc');
   if(createBtn){
     createBtn.textContent='⚡ Appliquer et relancer';
     createBtn.onclick=async()=>{
-      // Lire les nouveaux settings comme dans createRoom
       const mode=document.querySelector('.mc.sel')?.id?.replace('mode-','')||G.settings.mode;
-      const nbQ=parseInt(document.getElementById('nb-q')?.value)||G.settings.nbQ;
-      const qTime=parseInt(document.getElementById('q-time')?.value)||G.settings.qTime;
-      G.settings={...G.settings,mode,nbQ,qTime};
-      if(sb)await sb.from('rooms').update({settings:G.settings,status:'waiting',current_q:0,questions:null}).eq('code',G.code);
-      G.players.forEach(p=>G.scores[p.name]=0);
-      if(sb){
-        await sb.from('answers').delete().eq('room_code',G.code);
-        await sb.from('players').update({score:0}).eq('room_code',G.code);
-      }
-      // Restaurer le bouton original
+      const nbQ=+document.getElementById('cr-qcount')?.value||G.settings.qCount;
+      const qTime=+document.getElementById('cr-qtime')?.value||G.settings.qTime;
+      const cats=G.selCats?.length?G.selCats:G.settings.categories;
+      const diff=G.selDiff||G.settings.diff;
+      const powerups=mode!=='FREE'||!!(document.getElementById('cr-powerups')?.checked);
+      const showTries=mode==='FREE'&&!!(document.getElementById('cr-showtries')?.checked);
+      G.settings={...G.settings,mode,qCount:nbQ,qTime,categories:cats,diff,powerups,showTries};
+      await sb.from('rooms').update({settings:G.settings,status:'waiting',current_q:0,questions:null}).eq('code',G.code);
       createBtn.textContent='Créer la partie ⚡';
       createBtn.onclick=()=>createRoom();
-      launchGame();
+      await playAgain();
     };
   }
 }
