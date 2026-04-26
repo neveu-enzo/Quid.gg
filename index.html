@@ -1305,7 +1305,7 @@ function renderLobbyAction(){
   if(G.isHost){
     const total=G.players.length;
     const ready=G.players.filter(p=>p.is_ready).length;
-    const allReady=ready>=total&&total>0;
+    const allReady=ready>=total&&total>0||G.players.every(p=>!p.is_ready===false||p.is_ready===null||p.is_ready===undefined);
     el.innerHTML=`
       <div style="text-align:center;margin-bottom:8px;font-size:13px;color:var(--muted)">${ready}/${total} joueur${total>1?'s':''} prêt${ready>1?'s':''}</div>
       <button class="btn btn-acc btn-full" style="padding:16px;font-size:16px;margin-top:4px;opacity:${allReady?1:0.4};pointer-events:${allReady?'auto':'none'}" onclick="launchGame()">⚡ Lancer la partie</button>
