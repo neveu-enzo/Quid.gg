@@ -1639,11 +1639,11 @@ async function submitText(){
   const normalize=s=>s.toLowerCase().trim()
   .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
   .replace(/[^a-z0-9\s]/g,'').replace(/\s+/g,' ');
-  const valNorm=normalize(val);
-  const ok=validAnswers.some(a=>{
-    const aNorm=normalize(a||'');
-    return valNorm===aNorm||(aNorm.length>2&&(aNorm.includes(valNorm)||valNorm.includes(aNorm))&&valNorm.length>2);
-  });
+const valNorm=normalize(val);
+const ok=validAnswers.some(a=>{
+  const aNorm=normalize(a||'');
+  return valNorm===aNorm;
+});
   const isFreeMode=G.settings.mode==='FREE';
 
   if(isFreeMode&&!ok){
@@ -2163,8 +2163,11 @@ async function playAgain(){
   if(sb){
     await sb.from('answers').delete().eq('room_code',G.code);
     await sb.from('players').update({score:0,last_answer_at:null}).eq('room_code',G.code);
+    await sb.from('rooms').update({status:'waiting',current_q:0,questions:null}).eq('code',G.code);
   }
-  if(G.isHost)launchGame();else{openLobby();toast('⏳ En attente de l\'hôte…');}
+  openLobby();
+  if(G.isHost)toast('✅ Prêt ! Lance la partie quand tout le monde est là.');
+  else toast('⏳ En attente de l\'hôte…');
 }
 function changeRules(){
   if(!G.isHost){toast('Seul l\'hôte peut changer les règles');return;}
