@@ -1305,11 +1305,11 @@ function renderLobbyAction(){
   if(G.isHost){
     const total=G.players.length;
     const ready=G.players.filter(p=>p.is_ready).length;
-    const allReady=ready>=total&&total>0||G.players.every(p=>!p.is_ready===false||p.is_ready===null||p.is_ready===undefined);
+    const allReady=!G.gameStarted||(ready>=total&&total>0);
     el.innerHTML=`
-      <div style="text-align:center;margin-bottom:8px;font-size:13px;color:var(--muted)">${ready}/${total} joueur${total>1?'s':''} prêt${ready>1?'s':''}</div>
-      <button class="btn btn-acc btn-full" style="padding:16px;font-size:16px;margin-top:4px;opacity:${allReady?1:0.4};pointer-events:${allReady?'auto':'none'}" onclick="launchGame()">⚡ Lancer la partie</button>
-      ${!allReady?'<div style="text-align:center;margin-top:8px;font-size:12px;color:var(--muted)">En attente que tous les joueurs cliquent sur Rejouer…</div>':''}`;
+      <div style="text-align:center;margin-bottom:8px;font-size:13px;color:var(--muted)">${G.gameStarted?`${ready}/${total} joueur${total>1?'s':''} prêt${ready>1?'s':''}`:''}</div>
+      <button class="btn btn-acc btn-full" style="padding:16px;font-size:16px;margin-top:4px;opacity:${allReady?1:0.4};pointer-events:${allReady?'auto':'none'}" onclick="launchGame()">⚡ Lancer la partie (${total} joueur${total>1?'s':''})</button>
+      ${G.gameStarted&&!allReady?'<div style="text-align:center;margin-top:8px;font-size:12px;color:var(--muted)">En attente que tous les joueurs cliquent sur Rejouer…</div>':''}`;
   }else{
     el.innerHTML=`<div class="wb"><p style="color:var(--muted);font-size:14px">En attente que l'hôte lance la partie…</p><div class="wdots"><span class="wd"></span><span class="wd"></span><span class="wd"></span></div></div>`;
   }
@@ -1319,13 +1319,14 @@ function shareRoom(){if(navigator.share)navigator.share({title:'Quid.gg',text:`R
 
 // LAUNCH
 async function launchGame(){
-  // Stop host polling if demo mode
+  G.gameStarted=true;
   go('loading');sndStart();
   const{data:roomData}=await sb.from('rooms').select('used_questions').eq('code',G.code).maybeSingle();
   const usedQs=roomData?.used_questions||[];
   G.questions=shuffle(await fetchQs(G.settings.categories.join(', '),G.settings.qCount,G.settings.diff,G.settings.mode,usedQs));
   G.qIdx=0;G.players.forEach(p=>G.scores[p.name]=0);G.dotAns={};G.pu={f50:1,x2:1,d2:1};G.x2Active=false;
   const newUsed=[...new Set([...usedQs,...G.questions.map(q=>(q.question||'').toLowerCase().trim())])];
+  await sb.from('players').update({score:0,is_ready:false}).eq('room_code',G.code);
   await sb.from('rooms').update({status:'playing',questions:G.questions,current_q:0,used_questions:newUsed}).eq('code',G.code);
   showQuestion();
 }
